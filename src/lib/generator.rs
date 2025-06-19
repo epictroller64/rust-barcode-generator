@@ -5,7 +5,11 @@ use std::fs;
 
 use ab_glyph::{FontArc, PxScale};
 use imageproc::drawing::draw_text_mut;
-use zxingcpp::BarcodeFormat;
+
+use crate::{
+    barcode_config::{BarcodeConfig, BarcodeTextStyleConfig, TextPosition},
+    image_editor::ImageEditor,
+};
 
 pub struct Generator {}
 
@@ -13,28 +17,44 @@ impl Generator {
     pub fn new() -> Self {
         Self {}
     }
-    pub fn generate_barcode_svg(&self, data: &str, config: BarcodeConfig) -> anyhow::Result<()> {
+    pub fn generate_barcode_svg(
+        &self,
+        data: &str,
+        config: BarcodeConfig,
+        filename: &str,
+    ) -> anyhow::Result<()> {
         let barcode = zxingcpp::create(config.format)
             .from_str(data)?
             .to_svg_with(&zxingcpp::write().scale(5))?;
-        fs::write("barcode.svg", barcode)?;
+        fs::write(filename, barcode)?;
         Ok(())
     }
 
-    pub fn generate_barcode_png(&self, data: &str, config: BarcodeConfig) -> anyhow::Result<()> {
+    pub fn generate_barcode_png(
+        &self,
+        data: &str,
+        config: BarcodeConfig,
+        filename: &str,
+    ) -> anyhow::Result<()> {
         let barcode = zxingcpp::create(config.format)
             .from_str(data)?
-            .to_image_with(&zxingcpp::write().scale(5))?;
+            .to_image_with(
+                &zxingcpp::write()
+                    .with_quiet_zones(false)
+                    .scale(config.scale),
+            )?;
         let (width, height) = (barcode.width() as u32, barcode.height() as u32);
         let mut image: ImageBuffer<Luma<u8>, Vec<u8>> =
             ImageBuffer::from_raw(width, height, barcode.data().to_vec())
                 .expect("Failed to create image buffer");
+        let image_editor = ImageEditor::new(&image);
+        image = image_editor.resize(width, height - 200);
 
         for text_cfg in &config.texts {
             image = add_text_to_luma_image(image, &text_cfg.text, text_cfg)?;
         }
 
-        image.save(&config.filename)?;
+        image.save(filename)?;
         Ok(())
     }
 }
@@ -59,9 +79,10 @@ fn add_text_to_luma_image(
         fontdue::FontSettings::default(),
     )
     .unwrap();
+
     let scale = PxScale::from(style.text_size as f32);
     let text_width = calculate_text_width(&text, &fontcalc, style.text_size as f32);
-    let text_height = style.text_size + 10; // Add some margin
+    let text_height: u32 = style.text_size + 10; // Add some margin
     let barcode_width = luma_img.width();
     let barcode_height = luma_img.height();
 
@@ -82,7 +103,7 @@ fn add_text_to_luma_image(
             barcode_height + text_height,
             0,  // barcode at the top
             10, // text below barcode, left
-            barcode_height as i32 + 5,
+            barcode_height + 5,
         ),
         TextPosition::UpperCenter => (
             barcode_width,
@@ -96,7 +117,7 @@ fn add_text_to_luma_image(
             barcode_height + text_height,
             0,
             center_x,
-            barcode_height as i32 + 5,
+            barcode_height + 5,
         ),
         TextPosition::None => {
             // No text, just return the barcode as Luma
@@ -104,44 +125,23 @@ fn add_text_to_luma_image(
         }
     };
 
-    let mut final_img = RgbImage::new(new_width, new_height);
+    let mut final_img = RgbImage::new(new_width, new_height as u32);
     // Fill with white
     for pixel in final_img.pixels_mut() {
         *pixel = Rgb([255, 255, 255]);
     }
     // Paste barcode
-    image::imageops::replace(&mut final_img, &rgb_barcode, 0, barcode_y as i64);
+    image::imageops::replace(&mut final_img, &rgb_barcode, 0, barcode_y.into());
     // Draw text
     draw_text_mut(
         &mut final_img,
         style.text_color,
         text_x,
-        text_y,
+        text_y as i32,
         scale,
         &font,
         text,
     );
     // Convert back to Luma for further grayscale processing
     Ok(DynamicImage::ImageRgb8(final_img).to_luma8())
-}
-
-pub struct BarcodeConfig {
-    pub format: BarcodeFormat,
-    pub filename: String,
-    pub texts: Vec<BarcodeTextStyleConfig>,
-}
-
-pub struct BarcodeTextStyleConfig {
-    pub text: String,
-    pub text_color: Rgb<u8>,
-    pub text_size: u32,
-    pub text_position: TextPosition,
-}
-
-pub enum TextPosition {
-    Upper,
-    Lower,
-    None,
-    UpperCenter,
-    LowerCenter,
 }

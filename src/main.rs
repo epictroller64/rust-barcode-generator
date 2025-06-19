@@ -1,32 +1,29 @@
 use image::Rgb;
-use rust_barcode_generator::generator::{
-    BarcodeConfig, BarcodeTextStyleConfig, Generator, TextPosition,
-};
+use rust_barcode_generator::barcode_config::{BarcodeConfigBuilder, TextPosition};
+use rust_barcode_generator::generator::Generator;
 use zxingcpp::BarcodeFormat;
 
 fn main() {
     let generator = Generator::new();
-    if let Err(e) = generator.generate_barcode_png(
-        "123456789012",
-        BarcodeConfig {
-            format: BarcodeFormat::Code128,
-            filename: "test.png".to_string(),
-            texts: vec![
-                BarcodeTextStyleConfig {
-                    text: "text".to_string(),
-                    text_color: Rgb([255, 0, 0]),
-                    text_size: 35,
-                    text_position: TextPosition::UpperCenter,
-                },
-                BarcodeTextStyleConfig {
-                    text: "text".to_string(),
-                    text_color: Rgb([255, 0, 0]),
-                    text_size: 25,
-                    text_position: TextPosition::LowerCenter,
-                },
-            ],
-        },
-    ) {
+    let config = BarcodeConfigBuilder::new()
+        .resize_height_percentage(50.0)
+        .resize_width_percentage(50.0)
+        .set_format(BarcodeFormat::Code128)
+        .set_scale(7)
+        .add_text(
+            "abcABCCCCCCCC1234567890",
+            Rgb([255, 0, 0]),
+            65,
+            TextPosition::UpperCenter,
+        )
+        .add_text(
+            "abcABCCCCCCCC1234567890",
+            Rgb([255, 0, 0]),
+            25,
+            TextPosition::LowerCenter,
+        )
+        .build();
+    if let Err(e) = generator.generate_barcode_png("123456789012", config, "barcode.png") {
         eprintln!("Error: {}", e);
     }
 }
