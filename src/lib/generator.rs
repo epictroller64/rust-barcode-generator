@@ -44,17 +44,28 @@ impl Generator {
                     .scale(config.scale),
             )?;
         let (width, height) = (barcode.width() as u32, barcode.height() as u32);
-        let mut image: ImageBuffer<Luma<u8>, Vec<u8>> =
+        let image: ImageBuffer<Luma<u8>, Vec<u8>> =
             ImageBuffer::from_raw(width, height, barcode.data().to_vec())
                 .expect("Failed to create image buffer");
-        let image_editor = ImageEditor::new(&image);
-        image = image_editor.resize(width, height - 200);
 
-        for text_cfg in &config.texts {
-            image = add_text_to_luma_image(image, &text_cfg.text, text_cfg)?;
+        // Resize image as needed
+        let image_editor = ImageEditor::new(&image);
+        let mut final_image = if config.dimensions.width_percentage != 100.0 {
+            image_editor.resize_width_percentage(config.dimensions.width_percentage)
+        } else {
+            image.clone()
+        };
+
+        if config.dimensions.height_percentage != 100.0 {
+            final_image =
+                image_editor.resize_height_percentage(config.dimensions.height_percentage);
         }
 
-        image.save(filename)?;
+        for text_cfg in &config.texts {
+            final_image = add_text_to_luma_image(final_image, &text_cfg.text, text_cfg)?;
+        }
+
+        final_image.save(filename)?;
         Ok(())
     }
 }

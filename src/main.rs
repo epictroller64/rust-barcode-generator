@@ -1,4 +1,3 @@
-use rust_barcode_generator::barcode_config::BarcodeConfigBuilder;
 use rust_barcode_generator::bulk_generator::BulkGenerator;
 
 fn main() {

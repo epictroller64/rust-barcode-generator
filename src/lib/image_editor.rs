@@ -21,4 +21,10 @@ impl<'a> ImageEditor<'a> {
         let reduced_height = (height as f32 * (percentage / 100.0)) as u32;
         self.resize(self.image.width(), reduced_height)
     }
+
+    pub fn resize_width_percentage(&self, percentage: f32) -> ImageBuffer<Luma<u8>, Vec<u8>> {
+        let width = self.image.width();
+        let reduced_width = (width as f32 * (percentage / 100.0)) as u32;
+        self.resize(reduced_width, self.image.height())
+    }
 }
