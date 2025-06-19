@@ -81,8 +81,20 @@ impl Generator {
         let width = width.max(1);
         let height = height.max(1);
 
+        // Debug prints
+        println!("Barcode data size: {} bytes", barcode.data().len());
+        println!("Calculated dimensions: {}x{} pixels", width, height);
+        println!(
+            "Expected data size: {} bytes",
+            width as usize * height as usize
+        );
+
+        // Use the actual barcode dimensions instead of calculated ones
+        let barcode_width = barcode.width() as u32;
+        let barcode_height = barcode.height() as u32;
+
         let mut image: ImageBuffer<Luma<u8>, Vec<u8>> =
-            ImageBuffer::from_raw(width, height, barcode.data().to_vec())
+            ImageBuffer::from_raw(barcode_width, barcode_height, barcode.data().to_vec())
                 .expect("Failed to create image buffer");
 
         // Resize image as needed
