@@ -45,6 +45,7 @@ pub struct BarcodeTextStyleConfig {
     pub text_color: Rgb<u8>,
     pub text_size: u32,
     pub text_position: TextPosition,
+    pub font: String,
 }
 
 #[derive(Clone)]
@@ -108,6 +109,7 @@ impl BarcodeConfigBuilder {
             text_color,
             text_size,
             text_position,
+            font: "DejaVuSans".to_string(),
         });
         Self {
             config: BarcodeConfig {

@@ -84,12 +84,20 @@ fn add_text_to_luma_image(
     text: &str,
     style: &BarcodeTextStyleConfig,
 ) -> anyhow::Result<ImageBuffer<Luma<u8>, Vec<u8>>> {
-    let font = FontArc::try_from_slice(include_bytes!("../../assets/DejaVuSans.ttf")).unwrap();
-    let fontcalc = Font::from_bytes(
-        include_bytes!("../../assets/DejaVuSans.ttf") as &[u8],
-        fontdue::FontSettings::default(),
-    )
-    .unwrap();
+    let font_path = format!("./assets/{}.ttf", style.font);
+    let font_bytes = fs::read(&font_path).map_err(|e| {
+        anyhow::anyhow!(
+            "Failed to load font {} with path {} from files: {}",
+            style.font,
+            font_path,
+            e
+        )
+    })?;
+    let cloned_font_bytes = font_bytes.clone();
+
+    let font = FontArc::try_from_vec(font_bytes).unwrap();
+
+    let fontcalc = Font::from_bytes(cloned_font_bytes, fontdue::FontSettings::default()).unwrap();
 
     let scale = PxScale::from(style.text_size as f32);
     let text_width = calculate_text_width(&text, &fontcalc, style.text_size as f32);
