@@ -22,12 +22,16 @@ impl Generator {
         data: &str,
         config: BarcodeConfig,
         filename: &str,
-    ) -> anyhow::Result<()> {
+    ) -> anyhow::Result<GeneratedBarcode> {
         let barcode = zxingcpp::create(config.format)
             .from_str(data)?
             .to_svg_with(&zxingcpp::write().scale(5))?;
         fs::write(filename, barcode)?;
-        Ok(())
+        Ok(GeneratedBarcode {
+            file_path: filename.to_string(),
+            value: data.to_string(),
+            buffer: ImageBuffer::new(0, 0),
+        })
     }
 
     pub fn generate_barcode_png(
@@ -35,7 +39,7 @@ impl Generator {
         data: &str,
         config: BarcodeConfig,
         filename: &str,
-    ) -> anyhow::Result<()> {
+    ) -> anyhow::Result<GeneratedBarcode> {
         let barcode = zxingcpp::create(config.format)
             .from_str(data)?
             .to_image_with(
@@ -66,7 +70,11 @@ impl Generator {
         }
 
         final_image.save(filename)?;
-        Ok(())
+        Ok(GeneratedBarcode {
+            file_path: filename.to_string(),
+            value: data.to_string(),
+            buffer: final_image,
+        })
     }
 }
 
@@ -163,4 +171,11 @@ fn add_text_to_luma_image(
     );
     // Convert back to Luma for further grayscale processing
     Ok(DynamicImage::ImageRgb8(final_img).to_luma8())
+}
+
+#[derive(Debug, Clone)]
+pub struct GeneratedBarcode {
+    pub file_path: String,
+    pub value: String,
+    pub buffer: ImageBuffer<Luma<u8>, Vec<u8>>,
 }

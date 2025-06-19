@@ -2,6 +2,7 @@ use image::Rgb;
 
 use crate::barcode_config::BarcodeConfigBuilder;
 use crate::barcode_config::TextPosition;
+use crate::generator::GeneratedBarcode;
 use crate::generator::Generator;
 // Generate barcodes in bulk and export to file
 use crate::importer::BarcodeImportRowCSV;
@@ -18,14 +19,22 @@ impl BulkGenerator {
         }
     }
 
-    pub fn generate_barcodes_from_csv(&self, file_path: &str) -> anyhow::Result<()> {
+    pub fn generate_barcodes_from_csv(
+        &self,
+        file_path: &str,
+    ) -> anyhow::Result<Vec<GeneratedBarcode>> {
         let importer = Importer::new();
         let barcodes = importer.import_from_csv(file_path)?;
         self.generate_barcodes(barcodes)
     }
 
-    pub fn generate_barcodes(&self, barcodes: Vec<BarcodeImportRowCSV>) -> anyhow::Result<()> {
+    pub fn generate_barcodes(
+        &self,
+        barcodes: Vec<BarcodeImportRowCSV>,
+    ) -> anyhow::Result<Vec<GeneratedBarcode>> {
         let generator = Generator::new();
+
+        let mut generated_barcodes: Vec<GeneratedBarcode> = Vec::new();
 
         for barcode in barcodes {
             let mut config_builder = BarcodeConfigBuilder::new();
@@ -55,12 +64,13 @@ impl BulkGenerator {
             config_builder = config_builder.resize_width_percentage(barcode.width_percentage);
 
             let config = config_builder.build();
-            generator.generate_barcode_png(
+            let generated_barcode = generator.generate_barcode_png(
                 barcode.value.as_str(),
                 config,
                 &format!("{}/{}.png", self.output_dir, barcode.value),
             )?;
+            generated_barcodes.push(generated_barcode);
         }
-        Ok(())
+        Ok(generated_barcodes)
     }
 }

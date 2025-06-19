@@ -1,10 +1,13 @@
-use rust_barcode_generator::bulk_generator::BulkGenerator;
+use rust_barcode_generator::{bulk_generator::BulkGenerator, exporting::pdf_exporter::PdfExporter};
 
 fn main() {
     let bulk_generator = BulkGenerator::new();
-    bulk_generator
+    let barcodes = bulk_generator
         .generate_barcodes_from_csv("barcodes.csv")
         .unwrap();
+    let pdf_exporter = PdfExporter::new();
+    let pdf_bytes = pdf_exporter.create_pdf(barcodes);
+    std::fs::write("barcodes.pdf", pdf_bytes).unwrap();
 }
 
 //fn run_gui() {
