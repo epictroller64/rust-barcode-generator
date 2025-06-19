@@ -1,6 +1,7 @@
 pub mod barcode_config;
 pub mod bulk_generator;
 pub mod bulk_generator_config;
+pub mod calculator;
 pub mod exporter;
 pub mod exporting;
 pub mod generator;

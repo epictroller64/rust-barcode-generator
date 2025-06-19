@@ -1,4 +1,6 @@
-use printpdf::*;
+use ::image::ImageFormat;
+use image::{ImageBuffer, Rgb, RgbImage};
+use std::io::Cursor;
 
 use crate::generator::GeneratedBarcode;
 
@@ -10,53 +12,79 @@ impl PdfExporter {
     }
 
     pub fn create_pdf(&self, barcodes: Vec<GeneratedBarcode>) -> Vec<u8> {
-        let mut doc = PdfDocument::new("My first PDF");
-        let (width, height) = get_page_dimensions(Page::A4);
-        let page_contents = self.add_barcodes_to_page(&mut doc, barcodes);
-        let page = PdfPage::new(Mm(width), Mm(height), page_contents);
-        let pdf_bytes: Vec<u8> = doc
-            .with_pages(vec![page])
-            .save(&PdfSaveOptions::default(), &mut Vec::new());
-        pdf_bytes
+        // For now, let's create a PNG image instead
+        self.create_barcode_grid_image(barcodes)
     }
 
-    fn add_barcodes_to_page(
-        &self,
-        doc: &mut PdfDocument,
-        barcodes: Vec<GeneratedBarcode>,
-    ) -> Vec<Op> {
-        let mut warnings = Vec::new();
-        let mut images = Vec::<XObjectId>::new();
-        for barcode in barcodes {
-            let image = RawImage::decode_from_bytes(&barcode.buffer, &mut warnings).unwrap();
-            let image_xobject_id = doc.add_image(&image);
-            images.push(image_xobject_id);
+    pub fn create_barcode_grid_image(&self, barcodes: Vec<GeneratedBarcode>) -> Vec<u8> {
+        // Image dimensions in pixels (high resolution for good quality)
+        let image_width = 2480; // A4 width at 300 DPI
+        let image_height = 3508; // A4 height at 300 DPI
+
+        let first_barcode = barcodes.first().unwrap();
+        let barcode_width = first_barcode.buffer.width();
+        let barcode_height = first_barcode.buffer.height();
+
+        // Grid layout parameters
+        let margin = 40; // Margin from image edges in pixels
+        let spacing = 40; // Spacing between barcodes in pixels
+
+        // Calculate grid dimensions
+        let cols = (image_width - 2 * margin) / (barcode_width + spacing);
+        let cols = cols.max(1) as usize; // At least 1 column
+
+        // Create a white background image
+        let mut image = RgbImage::new(image_width, image_height);
+        for pixel in image.pixels_mut() {
+            *pixel = Rgb([255, 255, 255]); // White background
         }
-        let page1_contents = images
-            .iter()
-            .map(|id| Op::UseXobject {
-                id: id.clone(),
-                transform: XObjectTransform::default(),
-            })
-            .collect();
-        page1_contents
-    }
-}
 
-fn get_page_dimensions(page: Page) -> (f32, f32) {
-    match page {
-        Page::A4 => (210.0, 297.0),
-        Page::A3 => (297.0, 420.0),
-        Page::A2 => (420.0, 594.0),
-        Page::A1 => (594.0, 841.0),
-        Page::A0 => (841.0, 1189.0),
-    }
-}
+        for (index, barcode) in barcodes.iter().enumerate() {
+            // Calculate grid position
+            let row = index / cols;
+            let col = index % cols;
 
-enum Page {
-    A4,
-    A3,
-    A2,
-    A1,
-    A0,
+            // Calculate position in pixels
+            let x = margin + col as u32 * (barcode_width + spacing);
+            let y = margin + row as u32 * (barcode_height + spacing);
+
+            // Convert Luma image to RGB
+            let rgb_barcode = image::DynamicImage::ImageLuma8(barcode.buffer.clone()).to_rgb8();
+
+            // Resize barcode to fit the target size while maintaining aspect ratio
+            let barcode_scale_x = barcode_width as f32 / rgb_barcode.width() as f32;
+            let barcode_scale_y = barcode_height as f32 / rgb_barcode.height() as f32;
+            let scale = barcode_scale_x.min(barcode_scale_y);
+
+            let new_width = (rgb_barcode.width() as f32 * scale) as u32;
+            let new_height = (rgb_barcode.height() as f32 * scale) as u32;
+
+            let resized_barcode = image::imageops::resize(
+                &rgb_barcode,
+                new_width,
+                new_height,
+                image::imageops::FilterType::Nearest,
+            );
+
+            // Center the barcode in its allocated space
+            let offset_x = x + (barcode_width as u32 - new_width as u32) / 2;
+            let offset_y = y + (barcode_height as u32 - new_height as u32) / 2;
+
+            // Paste the barcode onto the main image
+            image::imageops::replace(
+                &mut image,
+                &resized_barcode,
+                offset_x.max(0).into(),
+                offset_y.max(0).into(),
+            );
+        }
+
+        // Convert to PNG bytes
+        let mut png_bytes = Vec::new();
+        image
+            .write_to(&mut Cursor::new(&mut png_bytes), ImageFormat::Png)
+            .unwrap();
+
+        png_bytes
+    }
 }

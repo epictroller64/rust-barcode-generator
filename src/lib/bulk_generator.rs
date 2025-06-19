@@ -1,4 +1,5 @@
 use image::Rgb;
+use zxingcpp::BarcodeFormat;
 
 use crate::barcode_config::BarcodeConfigBuilder;
 use crate::barcode_config::TextPosition;
@@ -28,9 +29,27 @@ impl BulkGenerator {
         self.generate_barcodes(barcodes)
     }
 
+    pub fn generate_barcodes_with_dpi_from_csv(
+        &self,
+        file_path: &str,
+        dpi: f32,
+    ) -> anyhow::Result<Vec<GeneratedBarcode>> {
+        let importer = Importer::new();
+        let barcodes = importer.import_from_csv(file_path)?;
+        self.generate_barcodes_with_dpi(barcodes, dpi)
+    }
+
     pub fn generate_barcodes(
         &self,
         barcodes: Vec<BarcodeImportRowCSV>,
+    ) -> anyhow::Result<Vec<GeneratedBarcode>> {
+        self.generate_barcodes_with_dpi(barcodes, 300.0)
+    }
+
+    pub fn generate_barcodes_with_dpi(
+        &self,
+        barcodes: Vec<BarcodeImportRowCSV>,
+        dpi: f32,
     ) -> anyhow::Result<Vec<GeneratedBarcode>> {
         let generator = Generator::new();
 
@@ -38,7 +57,7 @@ impl BulkGenerator {
 
         for barcode in barcodes {
             let mut config_builder = BarcodeConfigBuilder::new();
-
+            config_builder.set_format(BarcodeFormat::Code39);
             // Add upper text if not empty
             if !barcode.upper_center_text.is_empty() {
                 config_builder = config_builder.add_text(
@@ -64,10 +83,11 @@ impl BulkGenerator {
             config_builder = config_builder.resize_width_percentage(barcode.width_percentage);
 
             let config = config_builder.build();
-            let generated_barcode = generator.generate_barcode_png(
+            let generated_barcode = generator.generate_barcode_png_with_dpi(
                 barcode.value.as_str(),
                 config,
                 &format!("{}/{}.png", self.output_dir, barcode.value),
+                dpi,
             )?;
             generated_barcodes.push(generated_barcode);
         }

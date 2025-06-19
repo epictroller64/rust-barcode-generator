@@ -2,12 +2,14 @@ use anyhow::Ok;
 use fontdue::Font;
 use image::{DynamicImage, ImageBuffer, Luma, Rgb, RgbImage};
 use std::fs;
+use std::io::BufWriter;
 
 use ab_glyph::{FontArc, PxScale};
 use imageproc::drawing::draw_text_mut;
 
 use crate::{
     barcode_config::{BarcodeConfig, BarcodeTextStyleConfig, TextPosition},
+    calculator::DimensionCalculator,
     image_editor::ImageEditor,
 };
 
@@ -40,6 +42,16 @@ impl Generator {
         config: BarcodeConfig,
         filename: &str,
     ) -> anyhow::Result<GeneratedBarcode> {
+        self.generate_barcode_png_with_dpi(data, config, filename, 300.0)
+    }
+
+    pub fn generate_barcode_png_with_dpi(
+        &self,
+        data: &str,
+        config: BarcodeConfig,
+        filename: &str,
+        dpi: f32,
+    ) -> anyhow::Result<GeneratedBarcode> {
         let barcode = zxingcpp::create(config.format)
             .from_str(data)?
             .to_image_with(
@@ -47,33 +59,57 @@ impl Generator {
                     .with_quiet_zones(false)
                     .scale(config.scale),
             )?;
-        let (width, height) = (barcode.width() as u32, barcode.height() as u32);
-        let image: ImageBuffer<Luma<u8>, Vec<u8>> =
+
+        let width_mm = 48.5;
+        let height_mm = if config.texts.is_empty() {
+            16.9
+        } else {
+            let text_height_mm = DimensionCalculator::new()
+                .px_to_mm(config.texts.first().unwrap().text_size + 10, dpi)
+                * config.texts.len() as f32;
+            (16.9 - text_height_mm).max(1.0) // Ensure minimum height of 1mm
+        };
+
+        // calculate the height of the added texts in mm, subtract them. otherwise text will be distorted
+
+        let (width, height) = (
+            DimensionCalculator::new().mm_to_px(width_mm, dpi),
+            DimensionCalculator::new().mm_to_px(height_mm, dpi),
+        );
+
+        // Ensure minimum dimensions
+        let width = width.max(1);
+        let height = height.max(1);
+
+        let mut image: ImageBuffer<Luma<u8>, Vec<u8>> =
             ImageBuffer::from_raw(width, height, barcode.data().to_vec())
                 .expect("Failed to create image buffer");
 
         // Resize image as needed
         let image_editor = ImageEditor::new(&image);
-        let mut final_image = if config.dimensions.width_percentage != 100.0 {
-            image_editor.resize_width_percentage(config.dimensions.width_percentage)
-        } else {
-            image.clone()
-        };
+        //let mut final_image = image_editor.resize_to_dimensions_mm(width_mm, height_mm);
+        //let mut final_image = if config.dimensions.width_percentage != 100.0 {
+        //image_editor.resize_width_percentage(config.dimensions.width_percentage)
+        //} else {
+        //image.clone()
+        //};
 
-        if config.dimensions.height_percentage != 100.0 {
-            final_image =
-                image_editor.resize_height_percentage(config.dimensions.height_percentage);
-        }
+        //if config.dimensions.height_percentage != 100.0 {
+        //final_image =
+        //image_editor.resize_height_percentage(config.dimensions.height_percentage);
+        //}
 
         for text_cfg in &config.texts {
-            final_image = add_text_to_luma_image(final_image, &text_cfg.text, text_cfg)?;
+            image = add_text_to_luma_image(image, &text_cfg.text, text_cfg)?;
         }
 
-        final_image.save(filename)?;
+        // Save with custom DPI
+        save_image_with_dpi(&image, filename, dpi)?;
+
         Ok(GeneratedBarcode {
             file_path: filename.to_string(),
             value: data.to_string(),
-            buffer: final_image,
+            buffer: image,
         })
     }
 }
@@ -178,4 +214,33 @@ pub struct GeneratedBarcode {
     pub file_path: String,
     pub value: String,
     pub buffer: ImageBuffer<Luma<u8>, Vec<u8>>,
+}
+
+/// Save an image with custom DPI metadata
+fn save_image_with_dpi(
+    image: &ImageBuffer<Luma<u8>, Vec<u8>>,
+    filename: &str,
+    dpi: f32,
+) -> anyhow::Result<()> {
+    let file = fs::File::create(filename)?;
+    let ref mut w = BufWriter::new(file);
+
+    let mut encoder = png::Encoder::new(w, image.width(), image.height());
+
+    // Set DPI metadata using pHYs chunk
+    // Convert DPI to pixels per meter (1 inch = 0.0254 meters)
+    let pixels_per_meter = (dpi / 0.0254) as u32;
+    encoder.set_pixel_dims(Some(png::PixelDimensions {
+        xppu: pixels_per_meter,
+        yppu: pixels_per_meter,
+        unit: png::Unit::Meter,
+    }));
+
+    encoder.set_color(png::ColorType::Grayscale);
+    encoder.set_depth(png::BitDepth::Eight);
+
+    let mut writer = encoder.write_header()?;
+    writer.write_image_data(image.as_raw())?;
+
+    Ok(())
 }

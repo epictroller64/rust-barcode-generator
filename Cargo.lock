@@ -5352,6 +5352,7 @@ dependencies = [
  "gpui-component",
  "image 0.25.6",
  "imageproc",
+ "png",
  "printpdf",
  "rusttype",
  "serde",
