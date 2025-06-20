@@ -3,7 +3,7 @@ use image::{
     ImageBuffer, Luma, Pixel,
 };
 
-use crate::calculator::DimensionCalculator;
+use crate::generator::calculator::DimensionCalculator;
 
 pub struct ImageEditor {}
 

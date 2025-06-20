@@ -2,7 +2,7 @@ use ::image::ImageFormat;
 use image::{Rgb, RgbImage};
 use std::io::Cursor;
 
-use crate::{
+use crate::generator::{
     exporting::paper::{self, Paper},
     generator::GeneratedBarcode,
     image_editor::{ImageEditor, Side},

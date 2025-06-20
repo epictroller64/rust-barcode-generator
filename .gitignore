@@ -2,3 +2,6 @@
 *.png
 *.csv
 *.svg
+/target/
+/gen/schemas
+tasks planned.txt

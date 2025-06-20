@@ -7,8 +7,8 @@ use std::io::BufWriter;
 use ab_glyph::{FontArc, PxScale};
 use imageproc::drawing::draw_text_mut;
 
-use crate::{
-    barcode_config::{BarcodeConfig, BarcodeTextStyleConfig, TextPosition},
+use crate::generator::{
+    barcode_config::{BarcodeConfigInternal, BarcodeTextStyleConfigInternal, TextPosition},
     calculator::DimensionCalculator,
     image_editor::ImageEditor,
 };
@@ -22,7 +22,7 @@ impl Generator {
     pub fn generate_barcode_svg(
         &self,
         data: &str,
-        config: BarcodeConfig,
+        config: BarcodeConfigInternal,
         filename: &str,
     ) -> anyhow::Result<GeneratedBarcode> {
         let barcode = zxingcpp::create(config.format)
@@ -39,7 +39,7 @@ impl Generator {
     pub fn generate_barcode_png(
         &self,
         data: &str,
-        config: BarcodeConfig,
+        config: BarcodeConfigInternal,
         filename: &str,
     ) -> anyhow::Result<GeneratedBarcode> {
         self.generate_barcode_png_with_dpi(data, config, filename, 300.0)
@@ -48,7 +48,7 @@ impl Generator {
     pub fn generate_barcode_png_with_dpi(
         &self,
         data: &str,
-        config: BarcodeConfig,
+        config: BarcodeConfigInternal,
         filename: &str,
         dpi: f32,
     ) -> anyhow::Result<GeneratedBarcode> {
@@ -139,7 +139,7 @@ pub fn calculate_text_width(text: &str, font: &Font, font_size: f32) -> f32 {
 fn add_text_to_luma_image(
     luma_img: ImageBuffer<Luma<u8>, Vec<u8>>,
     text: &str,
-    style: &BarcodeTextStyleConfig,
+    style: &BarcodeTextStyleConfigInternal,
 ) -> anyhow::Result<ImageBuffer<Luma<u8>, Vec<u8>>> {
     let font_path = format!("./assets/{}.ttf", style.font);
     let font_bytes = fs::read(&font_path).map_err(|e| {

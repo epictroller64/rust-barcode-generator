@@ -1,4 +1,4 @@
-use crate::calculator::DimensionCalculator;
+use crate::generator::calculator::DimensionCalculator;
 
 pub enum Paper {
     A4,

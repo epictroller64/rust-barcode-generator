@@ -1,4 +1,4 @@
-use crate::generator::GeneratedBarcode;
+use crate::generator::generator::GeneratedBarcode;
 
 // Allow exporting barcodes to different final formats
 pub struct Exporter {}

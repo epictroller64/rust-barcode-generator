@@ -5,6 +5,5 @@ pub mod calculator;
 pub mod exporter;
 pub mod exporting;
 pub mod generator;
-pub mod gui;
 pub mod image_editor;
 pub mod importer;
