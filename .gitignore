@@ -1,5 +1,4 @@
 /target
-*.png
 *.csv
 *.svg
 /target/
