@@ -10,7 +10,7 @@ use imageproc::drawing::draw_text_mut;
 use crate::{
     barcode_config::{BarcodeConfig, BarcodeTextStyleConfig, TextPosition},
     calculator::DimensionCalculator,
-    image_editor::{ImageEditor, Side},
+    image_editor::ImageEditor,
 };
 
 pub struct Generator {}
@@ -56,7 +56,7 @@ impl Generator {
             .from_str(data)?
             .to_image_with(
                 &zxingcpp::write()
-                    .with_quiet_zones(true) //Generate quiet zones manually
+                    .with_quiet_zones(true) //TODO: Generate quiet zones manually
                     .scale(config.scale),
             )?;
 

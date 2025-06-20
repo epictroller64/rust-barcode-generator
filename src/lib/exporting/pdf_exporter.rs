@@ -1,19 +1,29 @@
 use ::image::ImageFormat;
-use image::{ImageBuffer, ImageEncoder, Rgb, RgbImage};
+use image::{Rgb, RgbImage};
 use std::io::Cursor;
 
 use crate::{
+    exporting::paper::{self, Paper},
     generator::GeneratedBarcode,
     image_editor::{ImageEditor, Side},
 };
 
-pub struct PdfExporter {}
+pub struct PdfExportConfig {
+    pub use_grid: bool,
+    pub auto_margin: bool,
+    pub paper: Paper,
+}
+
+pub struct PdfExporter {
+    pub config: PdfExportConfig,
+}
 
 impl PdfExporter {
-    pub fn new() -> Self {
-        Self {}
+    pub fn new(config: PdfExportConfig) -> Self {
+        Self { config }
     }
 
+    // Its actually pNG
     pub fn create_pdf(&self, barcodes: Vec<GeneratedBarcode>) -> Vec<u8> {
         self.create_barcode_grid_image(barcodes)
     }
@@ -37,8 +47,7 @@ impl PdfExporter {
         (margin_x, margin_y)
     }
     pub fn create_barcode_grid_image(&self, barcodes: Vec<GeneratedBarcode>) -> Vec<u8> {
-        let image_width = 2480; // A4 width at 300 DPI
-        let image_height = 3508; // A4 height at 300 DPI
+        let (image_width, image_height) = paper::get_paper_dimensions_px(&self.config.paper);
 
         let minimum_margin = 0;
         let spacing = 0; // Spacing between barcodes in pixels
@@ -50,14 +59,19 @@ impl PdfExporter {
         // Calculate grid dimensions
         let cols = (image_width - 2 * minimum_margin) / (barcode_width + spacing) as u32;
         let cols = cols.max(1); // At least 1 column
-        let (margin_x, margin_y) = self.calculate_auto_margins(
-            barcode_width,
-            barcode_height,
-            image_width,
-            image_height,
-            cols,
-        ); // Margin from image edges in pixels
-
+        let (margin_x, margin_y) = if self.config.auto_margin {
+            self.calculate_auto_margins(
+                barcode_width,
+                barcode_height,
+                image_width,
+                image_height,
+                cols,
+            )
+        }
+        // Margin from image edges in pixels
+        else {
+            (20 as u32, 20 as u32)
+        };
         // Create a white background image
         let mut image = RgbImage::new(image_width, image_height);
         for pixel in image.pixels_mut() {
@@ -65,6 +79,7 @@ impl PdfExporter {
         }
 
         let image_editor = ImageEditor::new();
+        let border_color = Rgb([211, 211, 211]);
         for (index, barcode) in barcodes.iter().enumerate() {
             // Calculate grid position
             let row = index as u32 / cols;
@@ -94,38 +109,40 @@ impl PdfExporter {
                 image::imageops::FilterType::Nearest,
             );
 
-            if row == 0 {
-                image_editor.add_border(
-                    &mut resized_barcode,
-                    1,
-                    Rgb([255, 0, 0]),
-                    vec![Side::Top, Side::Bottom],
-                );
-            } else {
-                image_editor.add_border(
-                    &mut resized_barcode,
-                    1,
-                    Rgb([255, 0, 0]),
-                    vec![Side::Bottom],
-                );
-            }
+            if self.config.use_grid {
+                if row == 0 {
+                    image_editor.add_border(
+                        &mut resized_barcode,
+                        1,
+                        border_color,
+                        vec![Side::Top, Side::Bottom],
+                    );
+                } else {
+                    image_editor.add_border(
+                        &mut resized_barcode,
+                        1,
+                        border_color,
+                        vec![Side::Bottom],
+                    );
+                }
 
-            if col == 0 {
-                // Row changed, add border to left side of the barcode
-                image_editor.add_border(
-                    &mut resized_barcode,
-                    1,
-                    Rgb([255, 0, 0]),
-                    vec![Side::Left],
-                );
-            }
-            if col <= cols - 1 {
-                image_editor.add_border(
-                    &mut resized_barcode,
-                    1,
-                    Rgb([255, 0, 0]),
-                    vec![Side::Right],
-                );
+                if col == 0 {
+                    // Row changed, add border to left side of the barcode
+                    image_editor.add_border(
+                        &mut resized_barcode,
+                        1,
+                        border_color,
+                        vec![Side::Left],
+                    );
+                }
+                if col <= cols - 1 {
+                    image_editor.add_border(
+                        &mut resized_barcode,
+                        1,
+                        border_color,
+                        vec![Side::Right],
+                    );
+                }
             }
             // Center the barcode in its allocated space
             let offset_x = x + (barcode_width - new_width) / 2;

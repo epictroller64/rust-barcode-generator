@@ -14,6 +14,8 @@ pub struct BarcodeConfig {
 pub struct BarcodeDimensions {
     pub height_percentage: f32,
     pub width_percentage: f32,
+    pub width_mm: f32,
+    pub height_mm: f32,
 }
 
 impl BarcodeDimensions {
@@ -21,6 +23,21 @@ impl BarcodeDimensions {
         Self {
             height_percentage: 100.0,
             width_percentage: 100.0,
+            width_mm: 48.5, // Default for code39
+            height_mm: 16.9,
+        }
+    }
+
+    pub fn resize_height_mm(&self, height: f32) -> Self {
+        Self {
+            height_mm: height,
+            ..*self
+        }
+    }
+    pub fn resize_width_mm(&self, width: f32) -> Self {
+        Self {
+            width_mm: width,
+            ..*self
         }
     }
 
@@ -46,6 +63,7 @@ pub struct BarcodeTextStyleConfig {
     pub text_size: u32,
     pub text_position: TextPosition,
     pub font: String,
+    pub margin: u32,
 }
 
 #[derive(Clone)]
@@ -109,6 +127,7 @@ impl BarcodeConfigBuilder {
             text_color,
             text_size,
             text_position,
+            margin: 5,
             font: "DejaVuSans".to_string(),
         });
         Self {

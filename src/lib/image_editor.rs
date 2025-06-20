@@ -40,10 +40,6 @@ impl ImageEditor {
         self.resize_dimensions(image, reduced_width, image.height())
     }
 
-    pub fn add_quiet_zones(&self, width: u32) {
-        // Create new image and paste the label after resizing
-    }
-
     // Add border to create grid when stacked on paper - creates double borders tho
     pub fn add_border<P, Container>(
         &self,

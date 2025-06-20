@@ -8,5 +8,5 @@ impl Exporter {
         Self {}
     }
 
-    pub fn export_barcodes_to_pdf(&self, barcodes: GeneratedBarcode) {}
+    pub fn export_barcodes_to_pdf(&self, _barcodes: GeneratedBarcode) {}
 }
