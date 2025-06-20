@@ -45,6 +45,21 @@ impl Generator {
         self.generate_barcode_png_with_dpi(data, config, filename, 300.0)
     }
 
+    fn calculate_total_text_height_mm(&self, config: &BarcodeConfigInternal) -> f32 {
+        // Check texts which are upper and lower, and calculate the total height
+        let mut total_height = 0.0;
+        for text in &config.texts {
+            if text.text_position == TextPosition::Upper
+                || text.text_position == TextPosition::Lower
+                || text.text_position == TextPosition::UpperCenter
+                || text.text_position == TextPosition::LowerCenter
+            {
+                total_height += text.text_size as f32 + text.margin as f32;
+            }
+        }
+        total_height
+    }
+
     pub fn generate_barcode_png_with_dpi(
         &self,
         data: &str,
@@ -56,18 +71,16 @@ impl Generator {
             .from_str(data)?
             .to_image_with(
                 &zxingcpp::write()
-                    .with_quiet_zones(true) //TODO: Generate quiet zones manually
+                    .with_quiet_zones(config.quiet_zones)
                     .scale(config.scale),
             )?;
 
-        let width_mm = 48.5;
+        let width_mm = config.dimensions.width_mm;
         let height_mm = if config.texts.is_empty() {
-            16.9
+            config.dimensions.height_mm
         } else {
-            let text_height_mm = DimensionCalculator::new()
-                .px_to_mm(config.texts.first().unwrap().text_size + 10, dpi)
-                * config.texts.len() as f32;
-            (16.9 - text_height_mm).max(1.0) // Ensure minimum height of 1mm
+            let text_height_mm = self.calculate_total_text_height_mm(&config);
+            (config.dimensions.height_mm - text_height_mm).max(1.0) // Ensure minimum height of 1mm
         };
 
         // calculate the height of the added texts in mm, subtract them. otherwise text will be distorted
@@ -104,10 +117,10 @@ impl Generator {
         };
         final_image = image_editor.resize_dimensions(&image, width, height);
 
-        //        if config.dimensions.height_percentage != 100.0 {
-        //          final_image =
-        //            image_editor.resize_height_percentage(&image, config.dimensions.height_percentage);
-        //  }
+        if config.dimensions.height_percentage != 100.0 {
+            final_image =
+                image_editor.resize_height_percentage(&image, config.dimensions.height_percentage);
+        }
 
         for text_cfg in &config.texts {
             final_image = add_text_to_luma_image(final_image, &text_cfg.text, text_cfg)?;

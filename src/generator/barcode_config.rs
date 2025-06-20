@@ -193,7 +193,7 @@ impl From<Rgb<u8>> for RgbWrapper {
     }
 }
 
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Clone, PartialEq, Serialize, Deserialize)]
 pub enum TextPosition {
     Upper,
     Lower,

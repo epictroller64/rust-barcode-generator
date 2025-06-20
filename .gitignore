@@ -4,3 +4,4 @@
 /target/
 /gen/schemas
 tasks planned.txt
+node_modules/
