@@ -10,7 +10,7 @@ use imageproc::drawing::draw_text_mut;
 use crate::{
     barcode_config::{BarcodeConfig, BarcodeTextStyleConfig, TextPosition},
     calculator::DimensionCalculator,
-    image_editor::ImageEditor,
+    image_editor::{ImageEditor, Side},
 };
 
 pub struct Generator {}
@@ -56,7 +56,7 @@ impl Generator {
             .from_str(data)?
             .to_image_with(
                 &zxingcpp::write()
-                    .with_quiet_zones(false)
+                    .with_quiet_zones(true) //Generate quiet zones manually
                     .scale(config.scale),
             )?;
 
@@ -82,12 +82,12 @@ impl Generator {
         let height = height.max(1);
 
         // Debug prints
-        println!("Barcode data size: {} bytes", barcode.data().len());
-        println!("Calculated dimensions: {}x{} pixels", width, height);
-        println!(
-            "Expected data size: {} bytes",
-            width as usize * height as usize
-        );
+        //println!("Barcode data size: {} bytes", barcode.data().len());
+        //println!("Calculated dimensions: {}x{} pixels", width, height);
+        //println!(
+        //    "Expected data size: {} bytes",
+        //    width as usize * height as usize
+        // );
 
         // Use the actual barcode dimensions instead of calculated ones
         let barcode_width = barcode.width() as u32;
@@ -96,24 +96,26 @@ impl Generator {
         let mut image: ImageBuffer<Luma<u8>, Vec<u8>> =
             ImageBuffer::from_raw(barcode_width, barcode_height, barcode.data().to_vec())
                 .expect("Failed to create image buffer");
-
+        let image_editor = ImageEditor::new();
         // Resize image as needed
-        let image_editor = ImageEditor::new(&image);
-        //let mut final_image = image_editor.resize_to_dimensions_mm(width_mm, height_mm);
-        //let mut final_image = if config.dimensions.width_percentage != 100.0 {
-        //image_editor.resize_width_percentage(config.dimensions.width_percentage)
-        //} else {
-        //image.clone()
-        //};
+        let mut final_image = if config.dimensions.width_percentage != 100.0 {
+            image_editor.resize_width_percentage(&image, config.dimensions.width_percentage)
+        } else {
+            image.clone()
+        };
+        config.dimensions.resize_height_percentage(40.0);
 
-        //if config.dimensions.height_percentage != 100.0 {
-        //final_image =
-        //image_editor.resize_height_percentage(config.dimensions.height_percentage);
-        //}
+        if config.dimensions.height_percentage != 100.0 {
+            final_image =
+                image_editor.resize_height_percentage(&image, config.dimensions.height_percentage);
+        }
 
         for text_cfg in &config.texts {
-            image = add_text_to_luma_image(image, &text_cfg.text, text_cfg)?;
+            final_image = add_text_to_luma_image(final_image, &text_cfg.text, text_cfg)?;
         }
+
+        //final_image = image_editor.add_border(final_image, 2, vec![Side::Top, Side::Left]);
+        image = final_image;
 
         // Save with custom DPI
         save_image_with_dpi(&image, filename, dpi)?;

@@ -19,7 +19,6 @@ impl Importer {
             let record: BarcodeImportRowCSV = result?;
             barcodes.push(record);
         }
-        println!("{:?}", barcodes);
         Ok(barcodes)
     }
 }

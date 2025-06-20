@@ -5,13 +5,12 @@ fn main() {
 
     // Generate barcodes with custom DPI (600 DPI for high quality printing)
     let barcodes = bulk_generator
-        .generate_barcodes_with_dpi_from_csv("barcodes.csv", 600.0)
+        .generate_barcodes_with_dpi_from_csv("barcodes.csv", 300.0)
         .unwrap();
 
     let pdf_exporter = PdfExporter::new();
     let png_bytes = pdf_exporter.create_pdf(barcodes);
     std::fs::write("barcodes_grid.png", png_bytes).unwrap();
-    println!("Barcode grid saved as barcodes_grid.png with 600 DPI");
 }
 
 //fn run_gui() {
