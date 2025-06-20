@@ -77,7 +77,6 @@ impl Generator {
             DimensionCalculator::new().mm_to_px(height_mm, dpi),
         );
 
-        // Ensure minimum dimensions
         let width = width.max(1);
         let height = height.max(1);
 
@@ -103,12 +102,12 @@ impl Generator {
         } else {
             image.clone()
         };
-        config.dimensions.resize_height_percentage(40.0);
+        final_image = image_editor.resize_dimensions(&image, width, height);
 
-        if config.dimensions.height_percentage != 100.0 {
-            final_image =
-                image_editor.resize_height_percentage(&image, config.dimensions.height_percentage);
-        }
+        //        if config.dimensions.height_percentage != 100.0 {
+        //          final_image =
+        //            image_editor.resize_height_percentage(&image, config.dimensions.height_percentage);
+        //  }
 
         for text_cfg in &config.texts {
             final_image = add_text_to_luma_image(final_image, &text_cfg.text, text_cfg)?;

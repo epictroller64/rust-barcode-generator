@@ -18,23 +18,45 @@ impl PdfExporter {
         self.create_barcode_grid_image(barcodes)
     }
 
-    fn create_grid(&self) {}
-
+    fn calculate_auto_margins(
+        &self,
+        barcode_width: u32,
+        barcode_height: u32,
+        image_width: u32,
+        image_height: u32,
+        cols: u32,
+    ) -> (u32, u32) {
+        let max_rows = image_height / barcode_height;
+        // get remaining whitespace after calculating total item width
+        let total_w = barcode_width * cols;
+        let total_h = barcode_height * max_rows;
+        let remaining_w = image_width - total_w;
+        let remaining_h = image_height - total_h;
+        let margin_x = remaining_w / 2;
+        let margin_y = remaining_h / 2;
+        (margin_x, margin_y)
+    }
     pub fn create_barcode_grid_image(&self, barcodes: Vec<GeneratedBarcode>) -> Vec<u8> {
         let image_width = 2480; // A4 width at 300 DPI
         let image_height = 3508; // A4 height at 300 DPI
 
+        let minimum_margin = 0;
+        let spacing = 0; // Spacing between barcodes in pixels
+                         // Grid layout parameters
         let first_barcode = barcodes.first().unwrap();
         let barcode_width = first_barcode.buffer.width();
         let barcode_height = first_barcode.buffer.height();
 
-        // Grid layout parameters
-        let margin = 20; // Margin from image edges in pixels
-        let spacing = 0; // Spacing between barcodes in pixels
-
         // Calculate grid dimensions
-        let cols = (image_width - 2 * margin) / (barcode_width + spacing) as u32;
+        let cols = (image_width - 2 * minimum_margin) / (barcode_width + spacing) as u32;
         let cols = cols.max(1); // At least 1 column
+        let (margin_x, margin_y) = self.calculate_auto_margins(
+            barcode_width,
+            barcode_height,
+            image_width,
+            image_height,
+            cols,
+        ); // Margin from image edges in pixels
 
         // Create a white background image
         let mut image = RgbImage::new(image_width, image_height);
@@ -51,8 +73,8 @@ impl PdfExporter {
             println!("Row: {}, col: {}", row, col);
 
             // Calculate position in pixels
-            let x = margin + col * (barcode_width + spacing);
-            let y = margin + row * (barcode_height + spacing);
+            let x = margin_x + col * (barcode_width + spacing);
+            let y = margin_y + row * (barcode_height + spacing);
 
             // Convert Luma image to RGB
             let rgb_barcode = image::DynamicImage::ImageLuma8(barcode.buffer.clone()).to_rgb8();
