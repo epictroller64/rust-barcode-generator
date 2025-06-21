@@ -105,17 +105,17 @@ impl Generator {
         let barcode_width = barcode.width() as u32;
         let barcode_height = barcode.height() as u32;
 
-        let mut image: ImageBuffer<Luma<u8>, Vec<u8>> =
+        let image: ImageBuffer<Luma<u8>, Vec<u8>> =
             ImageBuffer::from_raw(barcode_width, barcode_height, barcode.data().to_vec())
                 .expect("Failed to create image buffer");
         let image_editor = ImageEditor::new();
         // Resize image as needed
-        let mut final_image = if config.dimensions.width_percentage != 100.0 {
+        let image = if config.dimensions.width_percentage != 100.0 {
             image_editor.resize_width_percentage(&image, config.dimensions.width_percentage)
         } else {
             image.clone()
         };
-        final_image = image_editor.resize_dimensions(&image, width, height);
+        let mut final_image = image_editor.resize_dimensions(&image, width, height);
 
         if config.dimensions.height_percentage != 100.0 {
             final_image =
@@ -127,10 +127,9 @@ impl Generator {
         }
 
         //final_image = image_editor.add_border(final_image, 2, vec![Side::Top, Side::Left]);
-        image = final_image;
 
         // Save with custom DPI
-        save_image_with_dpi(&image, filename, dpi)?;
+        save_image_with_dpi(&final_image, filename, dpi)?;
 
         Ok(GeneratedBarcode {
             file_path: filename.to_string(),
