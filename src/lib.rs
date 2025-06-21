@@ -8,6 +8,8 @@ use crate::generator::barcode_config::BarcodeConfig;
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
+        .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_fs::init())
         .invoke_handler(tauri::generate_handler![generate_barcode])
         .setup(|app| {
             if cfg!(debug_assertions) {
@@ -39,25 +41,31 @@ fn generate_barcode(config: BarcodeConfig) -> Response {
     // Convert the serializable config to internal config
     let internal_config: crate::generator::barcode_config::BarcodeConfigInternal = config.into();
 
-    let generated_barcode = generator
+    match generator
         .generate_barcode_png(
             &internal_config.data.clone(),
             internal_config,
             &temp_filename,
         )
         .map_err(|e| e.to_string())
-        .unwrap();
+    {
+        Ok(generated_barcode) => {
+            // Convert the image buffer to PNG bytes
+            let mut png_bytes = Vec::new();
+            generated_barcode
+                .buffer
+                .write_with_encoder(image::codecs::png::PngEncoder::new(&mut png_bytes))
+                .map_err(|e| e.to_string())
+                .unwrap();
 
-    // Convert the image buffer to PNG bytes
-    let mut png_bytes = Vec::new();
-    generated_barcode
-        .buffer
-        .write_with_encoder(image::codecs::png::PngEncoder::new(&mut png_bytes))
-        .map_err(|e| e.to_string())
-        .unwrap();
+            // Clean up the temporary file
+            let _ = std::fs::remove_file(&temp_filename);
 
-    // Clean up the temporary file
-    let _ = std::fs::remove_file(&temp_filename);
-
-    tauri::ipc::Response::new(png_bytes)
+            tauri::ipc::Response::new(png_bytes)
+        }
+        Err(e) => {
+            println!("Error generating barcode: {}", e);
+            return Response::new(e.to_string());
+        }
+    }
 }

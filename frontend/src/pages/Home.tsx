@@ -1,6 +1,14 @@
 import React, { useState, useEffect } from 'react';
+import { save } from '@tauri-apps/plugin-dialog';
+import { writeFile } from '@tauri-apps/plugin-fs';
 import { invoke } from '@tauri-apps/api/core';
 import { BarcodeFormat, TextPosition, type BarcodeConfig, type BarcodeDimensions, type BarcodeTextStyleConfig, type RgbColor, createBarcodeFormatWrapper, getAvailableBarcodeFormats } from '../lib/interfaces';
+import { validationRules } from '../lib/validationRules';
+import ValidationNotification from '../components/ValidationNotification';
+import BarcodeDataInput from '../components/BarcodeDataInput';
+import DimensionsConfig from '../components/DimensionsConfig';
+import TextStyleConfig from '../components/TextStyleConfig';
+import BarcodePreview from '../components/BarcodePreview';
 
 const Home: React.FC = () => {
     const [config, setConfig] = useState<BarcodeConfig>({
@@ -11,7 +19,8 @@ const Home: React.FC = () => {
             text_size: 12,
             text_position: TextPosition.Lower,
             font: 'Arial',
-            margin: 5
+            margin: 5,
+            id: Date.now()
         }],
         scale: 2,
         quiet_zones: true,
@@ -27,6 +36,67 @@ const Home: React.FC = () => {
     const [generatedBarcode, setGeneratedBarcode] = useState<string>('');
     const [autoGenerate, setAutoGenerate] = useState<boolean>(true);
     const [isGenerating, setIsGenerating] = useState<boolean>(false);
+    const [validationErrors, setValidationErrors] = useState<string[]>([]);
+    const [showNotification, setShowNotification] = useState<boolean>(false);
+    const [isDownloading, setIsDownloading] = useState<boolean>(false);
+    const [downloadSuccess, setDownloadSuccess] = useState<boolean>(false);
+
+    const getCurrentValidationRule = () => {
+        return validationRules.find(rule => rule.format === config.format.format);
+    };
+
+    const validateBarcodeData = (data: string, format: BarcodeFormat): string[] => {
+        const rule = validationRules.find(r => r.format === format);
+        if (!rule) return [];
+
+        const errors: string[] = [];
+
+        if (data.length < rule.minLength) {
+            errors.push(`${format} requires at least ${rule.minLength} characters`);
+        }
+        if (data.length > rule.maxLength) {
+            errors.push(`${format} supports maximum ${rule.maxLength} characters`);
+        }
+
+        if (!rule.allowedCharactersRegex.test(data)) {
+            if (rule.allowedCharacters.length > 0) {
+                errors.push(`${format} only supports: ${rule.allowedCharacters.join(', ')}`);
+            } else {
+                errors.push(`${format} contains invalid characters`);
+            }
+        }
+
+        return errors;
+    };
+
+    const showValidationNotification = (errors: string[]) => {
+        setValidationErrors(errors);
+        setShowNotification(true);
+        setTimeout(() => setShowNotification(false), 5000);
+    };
+
+    const adjustDimensionsForFormat = (format: BarcodeFormat) => {
+        const rule = validationRules.find(r => r.format === format);
+        if (rule && rule.dimensions === 'square') {
+            setConfig(prev => ({
+                ...prev,
+                dimensions: {
+                    ...prev.dimensions,
+                    height_mm: prev.dimensions.width_mm,
+                    height_percentage: prev.dimensions.width_percentage
+                }
+            }));
+        } else if (rule && rule.dimensions === 'rectangular') {
+            setConfig(prev => ({
+                ...prev,
+                dimensions: {
+                    ...prev.dimensions,
+                    height_mm: 25,
+                    width_mm: 50
+                }
+            }));
+        }
+    };
 
     const handleConfigChange = (field: keyof BarcodeConfig, value: BarcodeConfig[keyof BarcodeConfig]) => {
         setConfig(prev => ({ ...prev, [field]: value }));
@@ -37,6 +107,13 @@ const Home: React.FC = () => {
             ...prev,
             format: createBarcodeFormatWrapper(format)
         }));
+        adjustDimensionsForFormat(format);
+        if (config.data.trim()) {
+            const errors = validateBarcodeData(config.data, format);
+            if (errors.length > 0) {
+                showValidationNotification(errors);
+            }
+        }
     };
 
     const handleTextChange = (index: number, field: keyof BarcodeTextStyleConfig, value: BarcodeTextStyleConfig[keyof BarcodeTextStyleConfig]) => {
@@ -61,10 +138,42 @@ const Home: React.FC = () => {
     };
 
     const handleDimensionsChange = (field: keyof BarcodeDimensions, value: number) => {
-        setConfig(prev => ({
-            ...prev,
-            dimensions: { ...prev.dimensions, [field]: value }
-        }));
+        const rule = getCurrentValidationRule();
+        setConfig(prev => {
+            const newDimensions = { ...prev.dimensions, [field]: value };
+            if (rule && rule.dimensions === 'square') {
+                if (field === 'width_mm') {
+                    newDimensions.height_mm = value;
+                } else if (field === 'height_mm') {
+                    newDimensions.width_mm = value;
+                } else if (field === 'width_percentage') {
+                    newDimensions.height_percentage = value;
+                } else if (field === 'height_percentage') {
+                    newDimensions.width_percentage = value;
+                }
+            }
+
+            return {
+                ...prev,
+                dimensions: newDimensions
+            };
+        });
+    };
+
+    const handleDataChange = (data: string) => {
+        setConfig(prev => ({ ...prev, data }));
+        if (data.trim()) {
+            const errors = validateBarcodeData(data, config.format.format as BarcodeFormat);
+            if (errors.length > 0) {
+                showValidationNotification(errors);
+            } else {
+                setValidationErrors([]);
+                setShowNotification(false);
+            }
+        } else {
+            setValidationErrors([]);
+            setShowNotification(false);
+        }
     };
 
     const addText = () => {
@@ -76,30 +185,39 @@ const Home: React.FC = () => {
                 text_size: 12,
                 text_position: TextPosition.Lower,
                 font: 'Arial',
-                margin: 5
+                margin: 5,
+                id: Date.now()
             }]
         }));
     };
 
-    const removeText = (index: number) => {
-        if (config.texts.length > 1) {
-            setConfig(prev => ({
+    const removeText = (id: number) => {
+        setConfig(prev => {
+            const newTexts = prev.texts.filter(text => text.id !== id);
+            return {
                 ...prev,
-                texts: prev.texts.filter((_, i) => i !== index)
-            }));
-        }
+                texts: newTexts
+            };
+        });
     };
 
-    // Auto-generate barcode when config changes
     useEffect(() => {
         if (autoGenerate && config.data.trim()) {
-            generateBarcode();
+            const errors = validateBarcodeData(config.data, config.format.format as BarcodeFormat);
+            if (errors.length === 0) {
+                generateBarcode();
+            }
         }
     }, [config, autoGenerate]);
 
-    // generate barcode and get bytebuffer back from tauri
     const generateBarcode = async () => {
         if (!config.data.trim()) return;
+
+        const errors = validateBarcodeData(config.data, config.format.format as BarcodeFormat);
+        if (errors.length > 0) {
+            showValidationNotification(errors);
+            return;
+        }
 
         try {
             setIsGenerating(true);
@@ -115,24 +233,55 @@ const Home: React.FC = () => {
             setGeneratedBarcode(dataUrl);
         } catch (error) {
             console.error('Error generating barcode:', error);
+            showValidationNotification(['Error generating barcode. Please check your configuration.']);
         } finally {
             setIsGenerating(false);
         }
     };
 
-    const downloadBarcode = () => {
-        if (generatedBarcode) {
-            const link = document.createElement('a');
-            link.href = generatedBarcode;
-            link.download = `barcode-${config.texts[0]?.text || 'generated'}.png`;
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
+    const downloadBarcode = async () => {
+        if (!generatedBarcode) return;
+
+        try {
+            setIsDownloading(true);
+            setDownloadSuccess(false);
+            const response = await fetch(generatedBarcode);
+            const blob = await response.blob();
+            const arrayBuffer = await blob.arrayBuffer();
+            const uint8Array = new Uint8Array(arrayBuffer);
+
+            const path = await save({
+                filters: [
+                    {
+                        name: 'PNG',
+                        extensions: ['png'],
+                    },
+                ],
+                defaultPath: `barcode-${config.data || 'generated'}.png`,
+            });
+
+            if (path) {
+                await writeFile(path, uint8Array);
+                setDownloadSuccess(true);
+                setTimeout(() => setDownloadSuccess(false), 3000);
+            }
+
+        } catch (error) {
+            console.error('Download failed:', error);
+            showValidationNotification(['Download failed. Please try again.']);
+        } finally {
+            setIsDownloading(false);
         }
     };
 
     return (
         <div className="min-h-screen bg-gray-50">
+            <ValidationNotification
+                showNotification={showNotification}
+                validationErrors={validationErrors}
+                onClose={() => setShowNotification(false)}
+            />
+
             <div className="text-center mb-12">
                 <h1 className="text-4xl font-bold text-gray-900 mb-2">Barcode Generator</h1>
                 <p className="text-lg text-gray-600">Generate professional barcodes with custom configurations</p>
@@ -155,16 +304,14 @@ const Home: React.FC = () => {
                             </button>
                         </div>
                     </div>
-                    <div className="mb-6">
-                        <label className="block font-medium text-gray-700 mb-2">Barcode Data</label>
-                        <input
-                            type="text"
-                            value={config.data}
-                            onChange={(e) => handleConfigChange('data', e.target.value)}
-                            placeholder="Enter barcode data"
-                            className="w-full px-3 py-3 border border-gray-300 rounded-lg text-base focus:border-blue-500 focus-ring"
-                        />
-                    </div>
+
+                    <BarcodeDataInput
+                        data={config.data}
+                        format={config.format.format}
+                        validationErrors={validationErrors}
+                        onDataChange={handleDataChange}
+                    />
+
                     <div className="mb-6">
                         <label className="block font-medium text-gray-700 mb-2">Barcode Format</label>
                         <select
@@ -177,6 +324,7 @@ const Home: React.FC = () => {
                             ))}
                         </select>
                     </div>
+
                     <div className="mb-6">
                         <label className="block font-medium text-gray-700 mb-2">Scale</label>
                         <input
@@ -188,6 +336,7 @@ const Home: React.FC = () => {
                             className="w-full px-3 py-3 border border-gray-300 rounded-lg text-base focus:border-blue-500 focus-ring"
                         />
                     </div>
+
                     <div className="mb-6">
                         <label className="block font-medium text-gray-700 mb-2">Quiet Zones</label>
                         <div className="flex items-center space-x-2">
@@ -200,171 +349,21 @@ const Home: React.FC = () => {
                             <label className="font-normal">Enable quiet zones</label>
                         </div>
                     </div>
-                    <div className="mb-6">
-                        <h3 className="text-lg font-semibold text-gray-900 mb-4">Dimensions</h3>
-                        <div className="grid grid-cols-2 gap-4">
-                            <div>
-                                <label className="block font-medium text-gray-700 mb-2">Width (mm)</label>
-                                <input
-                                    type="number"
-                                    value={config.dimensions.width_mm}
-                                    onChange={(e) => handleDimensionsChange('width_mm', parseFloat(e.target.value))}
-                                    step="0.1"
-                                    className="w-full px-3 py-3 border border-gray-300 rounded-lg text-base focus:border-blue-500 focus-ring"
-                                />
-                            </div>
-                            <div>
-                                <label className="block font-medium text-gray-700 mb-2">Height (mm)</label>
-                                <input
-                                    type="number"
-                                    value={config.dimensions.height_mm}
-                                    onChange={(e) => handleDimensionsChange('height_mm', parseFloat(e.target.value))}
-                                    step="0.1"
-                                    className="w-full px-3 py-3 border border-gray-300 rounded-lg text-base focus:border-blue-500 focus-ring"
-                                />
-                            </div>
-                            <div>
-                                <label className="block font-medium text-gray-700 mb-2">Width %</label>
-                                <input
-                                    type="number"
-                                    value={config.dimensions.width_percentage}
-                                    onChange={(e) => handleDimensionsChange('width_percentage', parseFloat(e.target.value))}
-                                    step="1"
-                                    className="w-full px-3 py-3 border border-gray-300 rounded-lg text-base focus:border-blue-500 focus-ring"
-                                />
-                            </div>
-                            <div>
-                                <label className="block font-medium text-gray-700 mb-2">Height %</label>
-                                <input
-                                    type="number"
-                                    value={config.dimensions.height_percentage}
-                                    onChange={(e) => handleDimensionsChange('height_percentage', parseFloat(e.target.value))}
-                                    step="1"
-                                    className="w-full px-3 py-3 border border-gray-300 rounded-lg text-base focus:border-blue-500 focus-ring"
-                                />
-                            </div>
-                        </div>
-                    </div>
-                    <div className="mb-6">
-                        <div className="flex justify-between items-center mb-4">
-                            <h3 className="text-lg font-semibold text-gray-900">Text Styles</h3>
-                            <button
-                                onClick={addText}
-                                className="px-3 py-1 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700"
-                            >
-                                Add Text
-                            </button>
-                        </div>
-                        {config.texts.map((textConfig, index) => (
-                            <div key={index} className="border border-gray-200 rounded-lg p-4 mb-4">
-                                <div className="flex justify-between items-center mb-3">
-                                    <h4 className="font-medium text-gray-900">Text {index + 1}</h4>
-                                    {config.texts.length > 1 && (
-                                        <button
-                                            onClick={() => removeText(index)}
-                                            className="px-2 py-1 bg-red-600 text-white text-sm rounded hover:bg-red-700"
-                                        >
-                                            Remove
-                                        </button>
-                                    )}
-                                </div>
-                                <div className="space-y-3">
-                                    <div>
-                                        <label className="block text-sm font-medium text-gray-700 mb-1">Text Content</label>
-                                        <input
-                                            type="text"
-                                            value={textConfig.text}
-                                            onChange={(e) => handleTextChange(index, 'text', e.target.value)}
-                                            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:border-blue-500 focus-ring"
-                                        />
-                                    </div>
-                                    <div className="grid grid-cols-2 gap-3">
-                                        <div>
-                                            <label className="block text-sm font-medium text-gray-700 mb-1">Text Size</label>
-                                            <input
-                                                type="number"
-                                                value={textConfig.text_size}
-                                                onChange={(e) => handleTextChange(index, 'text_size', parseInt(e.target.value))}
-                                                min="8"
-                                                max="72"
-                                                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:border-blue-500 focus-ring"
-                                            />
-                                        </div>
-                                        <div>
-                                            <label className="block text-sm font-medium text-gray-700 mb-1">Margin</label>
-                                            <input
-                                                type="number"
-                                                value={textConfig.margin}
-                                                onChange={(e) => handleTextChange(index, 'margin', parseInt(e.target.value))}
-                                                min="0"
-                                                max="50"
-                                                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:border-blue-500 focus-ring"
-                                            />
-                                        </div>
-                                    </div>
-                                    <div>
-                                        <label className="block text-sm font-medium text-gray-700 mb-1">Position</label>
-                                        <select
-                                            value={textConfig.text_position}
-                                            onChange={(e) => handleTextChange(index, 'text_position', e.target.value as TextPosition)}
-                                            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:border-blue-500 focus-ring"
-                                        >
-                                            {Object.values(TextPosition).map(position => (
-                                                <option key={position} value={position}>{position}</option>
-                                            ))}
-                                        </select>
-                                    </div>
-                                    <div>
-                                        <label className="block text-sm font-medium text-gray-700 mb-1">Font</label>
-                                        <input
-                                            type="text"
-                                            value={textConfig.font}
-                                            onChange={(e) => handleTextChange(index, 'font', e.target.value)}
-                                            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:border-blue-500 focus-ring"
-                                        />
-                                    </div>
-                                    <div>
-                                        <label className="block text-sm font-medium text-gray-700 mb-1">Text Color</label>
-                                        <div className="grid grid-cols-3 gap-2">
-                                            <div>
-                                                <label className="block text-xs text-gray-600">R</label>
-                                                <input
-                                                    type="number"
-                                                    value={textConfig.text_color.r}
-                                                    onChange={(e) => handleColorChange(index, 'r', parseInt(e.target.value))}
-                                                    min="0"
-                                                    max="255"
-                                                    className="w-full px-2 py-1 border border-gray-300 rounded text-sm focus:border-blue-500 focus-ring"
-                                                />
-                                            </div>
-                                            <div>
-                                                <label className="block text-xs text-gray-600">G</label>
-                                                <input
-                                                    type="number"
-                                                    value={textConfig.text_color.g}
-                                                    onChange={(e) => handleColorChange(index, 'g', parseInt(e.target.value))}
-                                                    min="0"
-                                                    max="255"
-                                                    className="w-full px-2 py-1 border border-gray-300 rounded text-sm focus:border-blue-500 focus-ring"
-                                                />
-                                            </div>
-                                            <div>
-                                                <label className="block text-xs text-gray-600">B</label>
-                                                <input
-                                                    type="number"
-                                                    value={textConfig.text_color.b}
-                                                    onChange={(e) => handleColorChange(index, 'b', parseInt(e.target.value))}
-                                                    min="0"
-                                                    max="255"
-                                                    className="w-full px-2 py-1 border border-gray-300 rounded text-sm focus:border-blue-500 focus-ring"
-                                                />
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        ))}
-                    </div>
+
+                    <DimensionsConfig
+                        dimensions={config.dimensions}
+                        format={config.format.format}
+                        onDimensionsChange={handleDimensionsChange}
+                    />
+
+                    <TextStyleConfig
+                        texts={config.texts}
+                        onTextChange={handleTextChange}
+                        onColorChange={handleColorChange}
+                        onAddText={addText}
+                        onRemoveText={removeText}
+                    />
+
                     {!autoGenerate && (
                         <button
                             onClick={generateBarcode}
@@ -375,48 +374,16 @@ const Home: React.FC = () => {
                         </button>
                     )}
                 </div>
-                <div className="bg-white p-8 rounded-2xl shadow-lg border border-gray-200">
-                    <div className="flex justify-between items-center mb-6">
-                        <h2 className="text-2xl font-semibold text-gray-900">Preview</h2>
-                        {!autoGenerate && (
-                            <button
-                                onClick={generateBarcode}
-                                disabled={isGenerating || !config.data.trim()}
-                                className="px-6 py-2 bg-blue-600 text-white font-semibold rounded-lg text-sm cursor-pointer transition-colors duration-200 hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
-                            >
-                                {isGenerating ? 'Generating...' : 'Generate'}
-                            </button>
-                        )}
-                    </div>
-                    <div className="min-h-[300px] flex items-center justify-center">
-                        {generatedBarcode ? (
-                            <div className="text-center">
-                                <img
-                                    src={generatedBarcode}
-                                    alt="Generated barcode"
-                                    className="max-w-full max-h-96 border border-gray-200 rounded-lg"
-                                />
-                                <button
-                                    onClick={downloadBarcode}
-                                    className="mt-4 px-6 py-3 bg-green-600 text-white font-semibold rounded-lg cursor-pointer transition-colors duration-200 hover:bg-green-700"
-                                >
-                                    Download PNG
-                                </button>
-                            </div>
-                        ) : (
-                            <div className="text-center text-gray-400">
-                                <div className="text-6xl mb-4">📊</div>
-                                <p className="text-lg">Your barcode will appear here</p>
-                                <p className="text-sm mt-2">
-                                    {autoGenerate
-                                        ? 'Configure settings and enter barcode data'
-                                        : 'Click "Generate" to create your barcode'
-                                    }
-                                </p>
-                            </div>
-                        )}
-                    </div>
-                </div>
+
+                <BarcodePreview
+                    generatedBarcode={generatedBarcode}
+                    autoGenerate={autoGenerate}
+                    isGenerating={isGenerating}
+                    isDownloading={isDownloading}
+                    downloadSuccess={downloadSuccess}
+                    onGenerate={generateBarcode}
+                    onDownload={downloadBarcode}
+                />
             </div>
         </div>
     );

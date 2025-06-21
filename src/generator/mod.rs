@@ -7,3 +7,4 @@ pub mod exporting;
 pub mod generator;
 pub mod image_editor;
 pub mod importer;
+pub mod validator;

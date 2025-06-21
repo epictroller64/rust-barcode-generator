@@ -21,6 +21,7 @@ export interface BarcodeTextStyleConfig {
     text_position: TextPosition;
     font: string;
     margin: number;
+    id: number;
 }
 
 export interface RgbColor {
