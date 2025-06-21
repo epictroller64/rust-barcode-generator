@@ -3,14 +3,21 @@ pub mod generator;
 use generator::generator::Generator;
 use tauri::ipc::Response;
 
-use crate::generator::barcode_config::BarcodeConfig;
+use crate::generator::{
+    barcode_config::BarcodeConfig,
+    templates::{self, Template},
+};
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())
-        .invoke_handler(tauri::generate_handler![generate_barcode])
+        .invoke_handler(tauri::generate_handler![
+            generate_barcode,
+            save_template,
+            get_templates
+        ])
         .setup(|app| {
             if cfg!(debug_assertions) {
                 app.handle().plugin(
@@ -23,6 +30,26 @@ pub fn run() {
         })
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
+}
+
+#[tauri::command]
+fn get_templates() -> String {
+    let template_response = templates::get_templates();
+    match template_response {
+        Ok(templates) => serde_json::to_string(&templates).unwrap(),
+        Err(e) => e.to_string(),
+    }
+}
+
+// Save the template to the templates folder
+#[tauri::command]
+fn save_template(config: BarcodeConfig, name: String, description: String) -> Response {
+    let template = Template::new(config, name, description);
+    let result = templates::save_template(template);
+    match result {
+        Ok(_) => Response::new("Successfully saved template".to_string()),
+        Err(e) => Response::new(e.to_string()),
+    }
 }
 
 #[tauri::command]

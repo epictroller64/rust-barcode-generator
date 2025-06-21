@@ -1,5 +1,9 @@
-use crate::generator::barcode_config::BarcodeConfig;
+use std::{collections::HashMap, fs::File, io::BufWriter};
+
+use crate::generator::{barcode_config::BarcodeConfig, database::Database};
 use uuid::Uuid;
+
+const TEMPLATES_PATH: &str = "templates.json";
 
 // Create templates for barcodes which contain all the configurations for the barcode.
 // This allows for bulk generation of barcodes etc
@@ -36,5 +40,36 @@ impl Template {
 
     pub fn generate_new_id(&mut self) {
         self.id = Uuid::new_v4().to_string();
+    }
+}
+
+pub fn save_template(template: Template) -> anyhow::Result<()> {
+    let db = Database::new(TEMPLATES_PATH.to_string());
+    let result = db.save_template(&template);
+    match result {
+        Ok(_) => Ok(()),
+        Err(e) => Err(anyhow::anyhow!("Failed to save template: {}", e)),
+    }
+}
+
+pub fn get_templates() -> anyhow::Result<Vec<Template>> {
+    let db = Database::new(TEMPLATES_PATH.to_string());
+    let result = db.load_templates();
+    match result {
+        Ok(templates) => Ok(templates.values().cloned().collect()),
+        Err(e) => {
+            eprintln!("Failed to load templates: {}", e);
+            Err(anyhow::anyhow!("Failed to load templates: {}", e))
+        }
+    }
+}
+
+pub fn get_template(id: String) -> anyhow::Result<Template> {
+    let db = Database::new(TEMPLATES_PATH.to_string());
+    let result = db.load_template(&id);
+    match result {
+        Ok(Some(template)) => Ok(template),
+        Ok(None) => Err(anyhow::anyhow!("Template not found")),
+        Err(e) => Err(anyhow::anyhow!("Failed to load template: {}", e)),
     }
 }
