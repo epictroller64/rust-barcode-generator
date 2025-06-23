@@ -1,37 +1,18 @@
 import React, { useState, useEffect } from 'react';
 import { save } from '@tauri-apps/plugin-dialog';
 import { writeFile } from '@tauri-apps/plugin-fs';
-import { invoke } from '@tauri-apps/api/core';
-import { BarcodeFormat, TextPosition, type BarcodeConfig, type BarcodeDimensions, type BarcodeTextStyleConfig, type RgbColor, createBarcodeFormatWrapper, getAvailableBarcodeFormats } from '../lib/interfaces';
+import { BarcodeFormat, TextPosition, type BarcodeConfig, type BarcodeDimensions, type BarcodeTextStyleConfig, type RgbColor, createBarcodeFormatWrapper, getAvailableBarcodeFormats, createDefaultBarcodeConfig } from '../lib/interfaces';
 import { validationRules } from '../lib/validationRules';
 import ValidationNotification from '../components/ValidationNotification';
 import BarcodeDataInput from '../components/BarcodeDataInput';
 import DimensionsConfig from '../components/DimensionsConfig';
 import TextStyleConfig from '../components/TextStyleConfig';
 import BarcodePreview from '../components/BarcodePreview';
+import TemplateManager from '../components/TemplateManager';
+import { getBarcodeResultAsBase64DataUrl, validateBarcodeData } from '../lib/utils';
 
 const Home: React.FC = () => {
-    const [config, setConfig] = useState<BarcodeConfig>({
-        format: createBarcodeFormatWrapper(BarcodeFormat.Code128),
-        texts: [{
-            text: '123456789',
-            text_color: { r: 0, g: 0, b: 0 },
-            text_size: 12,
-            text_position: TextPosition.Lower,
-            font: 'Arial',
-            margin: 5,
-            id: Date.now()
-        }],
-        scale: 2,
-        quiet_zones: true,
-        dimensions: {
-            height_percentage: 100,
-            width_percentage: 100,
-            width_mm: 50,
-            height_mm: 25
-        },
-        data: '123456789'
-    });
+    const [config, setConfig] = useState<BarcodeConfig>(createDefaultBarcodeConfig());
 
     const [generatedBarcode, setGeneratedBarcode] = useState<string>('');
     const [autoGenerate, setAutoGenerate] = useState<boolean>(true);
@@ -45,29 +26,6 @@ const Home: React.FC = () => {
         return validationRules.find(rule => rule.format === config.format.format);
     };
 
-    const validateBarcodeData = (data: string, format: BarcodeFormat): string[] => {
-        const rule = validationRules.find(r => r.format === format);
-        if (!rule) return [];
-
-        const errors: string[] = [];
-
-        if (data.length < rule.minLength) {
-            errors.push(`${format} requires at least ${rule.minLength} characters`);
-        }
-        if (data.length > rule.maxLength) {
-            errors.push(`${format} supports maximum ${rule.maxLength} characters`);
-        }
-
-        if (!rule.allowedCharactersRegex.test(data)) {
-            if (rule.allowedCharacters.length > 0) {
-                errors.push(`${format} only supports: ${rule.allowedCharacters.join(', ')}`);
-            } else {
-                errors.push(`${format} contains invalid characters`);
-            }
-        }
-
-        return errors;
-    };
 
     const showValidationNotification = (errors: string[]) => {
         setValidationErrors(errors);
@@ -201,6 +159,20 @@ const Home: React.FC = () => {
         });
     };
 
+    const handleLoadTemplate = (templateConfig: BarcodeConfig) => {
+        setConfig(templateConfig);
+        // Trigger barcode generation if auto-generate is enabled
+        if (autoGenerate && templateConfig.data.trim()) {
+            const errors = validateBarcodeData(templateConfig.data, templateConfig.format.format as BarcodeFormat);
+            if (errors.length === 0) {
+                // Use setTimeout to ensure state is updated before generating
+                setTimeout(() => {
+                    generateBarcode();
+                }, 0);
+            }
+        }
+    };
+
     useEffect(() => {
         if (autoGenerate && config.data.trim()) {
             const errors = validateBarcodeData(config.data, config.format.format as BarcodeFormat);
@@ -221,15 +193,7 @@ const Home: React.FC = () => {
 
         try {
             setIsGenerating(true);
-            const result = await invoke('generate_barcode', { config });
-            const arrayBuffer = result as ArrayBuffer;
-            const uint8Array = new Uint8Array(arrayBuffer);
-            let binaryString = '';
-            for (let i = 0; i < uint8Array.length; i++) {
-                binaryString += String.fromCharCode(uint8Array[i]);
-            }
-            const base64String = btoa(binaryString);
-            const dataUrl = `data:image/png;base64,${base64String}`;
+            const dataUrl = await getBarcodeResultAsBase64DataUrl(config);
             setGeneratedBarcode(dataUrl);
         } catch (error) {
             console.error('Error generating barcode:', error);
@@ -310,6 +274,16 @@ const Home: React.FC = () => {
                         format={config.format.format}
                         validationErrors={validationErrors}
                         onDataChange={handleDataChange}
+                    />
+
+                    <TemplateManager
+                        currentConfig={config}
+                        currentFormat={config.format.format as BarcodeFormat}
+                        onLoadTemplate={handleLoadTemplate}
+                        onTemplatesUpdated={() => {
+                            console.log('Templates updated');
+                            //not useful for now
+                        }}
                     />
 
                     <div className="mb-6">

@@ -1,5 +1,3 @@
-use std::{collections::HashMap, fs::File, io::BufWriter};
-
 use crate::generator::{barcode_config::BarcodeConfig, database::Database};
 use uuid::Uuid;
 
@@ -71,5 +69,14 @@ pub fn get_template(id: String) -> anyhow::Result<Template> {
         Ok(Some(template)) => Ok(template),
         Ok(None) => Err(anyhow::anyhow!("Template not found")),
         Err(e) => Err(anyhow::anyhow!("Failed to load template: {}", e)),
+    }
+}
+
+pub fn delete_template(id: &str) -> anyhow::Result<()> {
+    let db = Database::new(TEMPLATES_PATH.to_string());
+    let result = db.delete_template(id);
+    match result {
+        Ok(_) => Ok(()),
+        Err(e) => Err(anyhow::anyhow!("Failed to delete template: {}", e)),
     }
 }

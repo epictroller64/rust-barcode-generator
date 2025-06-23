@@ -7,6 +7,30 @@ export interface BarcodeConfig {
     data: string;
 }
 
+export function createDefaultBarcodeConfig(): BarcodeConfig {
+    return {
+        format: createBarcodeFormatWrapper(BarcodeFormat.Code128),
+        texts: [{
+            text: '123456789',
+            text_color: { r: 0, g: 0, b: 0 },
+            text_size: 12,
+            text_position: TextPosition.Lower,
+            font: 'Arial',
+            margin: 5,
+            id: Date.now()
+        }],
+        scale: 2,
+        quiet_zones: true,
+        dimensions: {
+            height_percentage: 100,
+            width_percentage: 100,
+            width_mm: 50,
+            height_mm: 25
+        },
+        data: '123456789'
+    }
+}
+
 export interface BarcodeDimensions {
     height_percentage: number;
     width_percentage: number;
@@ -95,4 +119,17 @@ export function getAvailableBarcodeFormats(): BarcodeFormat[] {
         BarcodeFormat.MicroQRCode,
         BarcodeFormat.RMQRCode
     ];
+}
+
+
+export interface Template {
+    config: BarcodeConfig;
+    name: string;
+    description: string;
+    id: string;
+}
+export interface JsonResponse<T> {
+    success: boolean;
+    message: string;
+    data?: T;
 }

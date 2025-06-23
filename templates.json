@@ -1,0 +1,68 @@
+{
+  "1750513319213": {
+    "config": {
+      "format": {
+        "format": "Code128"
+      },
+      "texts": [
+        {
+          "text": "123456789",
+          "text_color": {
+            "r": 0,
+            "g": 0,
+            "b": 0
+          },
+          "text_size": 12,
+          "text_position": "Lower",
+          "font": "Arial",
+          "margin": 5
+        }
+      ],
+      "scale": 2,
+      "quiet_zones": true,
+      "dimensions": {
+        "height_percentage": 100.0,
+        "width_percentage": 100.0,
+        "width_mm": 50.0,
+        "height_mm": 25.0
+      },
+      "data": "123456789"
+    },
+    "name": "a222",
+    "description": "asd",
+    "id": "1750513319213"
+  },
+  "1750513215842": {
+    "config": {
+      "format": {
+        "format": "Code128"
+      },
+      "texts": [
+        {
+          "text": "123456789",
+          "text_color": {
+            "r": 0,
+            "g": 0,
+            "b": 0
+          },
+          "text_size": 12,
+          "text_position": "Lower",
+          "font": "Arial",
+          "margin": 5
+        }
+      ],
+      "scale": 2,
+      "quiet_zones": true,
+      "dimensions": {
+        "height_percentage": 100.0,
+        "width_percentage": 100.0,
+        "width_mm": 50.0,
+        "height_mm": 25.0
+      },
+      "data": "123456789"
+    },
+    "name": "aa",
+    "description": "aaaa",
+    "id": "1750513215842"
+  }
+}
