@@ -40,7 +40,7 @@ impl BulkGenerator {
             config_builder.set_format(BarcodeFormat::Code39);
             // Add upper text if not empty
             if !barcode.upper_center_text.is_empty() {
-                config_builder = config_builder.add_text(
+                config_builder.add_text(
                     barcode.upper_center_text.as_str(),
                     Rgb([255, 0, 0]),
                     barcode.font_size,
@@ -50,7 +50,7 @@ impl BulkGenerator {
 
             // Add lower text if not empty
             if !barcode.lower_center_text.is_empty() {
-                config_builder = config_builder.add_text(
+                config_builder.add_text(
                     barcode.lower_center_text.as_str(),
                     Rgb([255, 0, 0]),
                     barcode.font_size,
@@ -58,9 +58,9 @@ impl BulkGenerator {
                 );
             }
 
-            config_builder = config_builder.set_scale(barcode.scale);
-            config_builder = config_builder.resize_height_percentage(barcode.height_percentage);
-            config_builder = config_builder.resize_width_percentage(barcode.width_percentage);
+            config_builder.set_scale(barcode.scale);
+            config_builder.resize_height_percentage(barcode.height_percentage);
+            config_builder.resize_width_percentage(barcode.width_percentage);
 
             let mut config = config_builder.build();
             config.data = barcode.value.clone();

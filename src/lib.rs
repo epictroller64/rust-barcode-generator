@@ -12,6 +12,8 @@ use crate::generator::{
     templates::{self, Template},
 };
 
+use serde_json;
+
 #[derive(Clone)]
 struct AppState {
     frontend: FrontendInterface,
@@ -89,13 +91,14 @@ fn generate_barcode(config: BarcodeConfig, state: State<'_, Mutex<AppState>>) ->
 
 #[tauri::command]
 fn get_imported_barcodes(state: State<'_, Mutex<AppState>>) -> JsonResponse {
-    let mut state = state.lock().unwrap();
+    let state = state.lock().unwrap();
     JsonResponse {
         success: true,
         message: "OK".to_string(),
-        data: Some(state.imported_barcodes),
+        data: Some(serde_json::to_value(&state.imported_barcodes).unwrap()),
     }
 }
+
 #[tauri::command]
 fn import_barcodes_csv(file_bytes: Vec<u8>, state: State<'_, Mutex<AppState>>) -> JsonResponse {
     let mut state = state.lock().unwrap();

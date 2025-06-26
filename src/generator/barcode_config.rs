@@ -226,64 +226,42 @@ impl BarcodeConfigBuilder {
         }
     }
 
-    pub fn set_format(&self, format: BarcodeFormat) -> Self {
-        Self {
-            config: BarcodeConfig {
-                format: format.into(),
-                ..self.config.clone()
-            },
-        }
+    pub fn set_format(&mut self, format: BarcodeFormat) -> &mut Self {
+        self.config.format = format.into();
+        self
     }
 
-    pub fn set_scale(&self, scale: i32) -> Self {
-        Self {
-            config: BarcodeConfig {
-                scale,
-                ..self.config.clone()
-            },
-        }
+    pub fn set_scale(&mut self, scale: i32) -> &mut Self {
+        self.config.scale = scale;
+        self
     }
 
     pub fn add_text(
-        &self,
+        &mut self,
         text: &str,
         text_color: Rgb<u8>,
         text_size: u32,
         text_position: TextPosition,
-    ) -> Self {
-        let mut texts = self.config.texts.clone();
-        texts.push(BarcodeTextStyleConfig {
+    ) -> &mut Self {
+        self.config.texts.push(BarcodeTextStyleConfig {
             text: text.to_string(),
             text_color: text_color.into(),
             text_size,
             text_position,
-            margin: 5,
             font: "DejaVuSans".to_string(),
+            margin: 5,
         });
-        Self {
-            config: BarcodeConfig {
-                texts,
-                ..self.config.clone()
-            },
-        }
+        self
     }
 
-    pub fn resize_height_percentage(&self, percentage: f32) -> Self {
-        Self {
-            config: BarcodeConfig {
-                dimensions: self.config.dimensions.resize_height_percentage(percentage),
-                ..self.config.clone()
-            },
-        }
+    pub fn resize_height_percentage(&mut self, percentage: f32) -> &mut Self {
+        self.config.dimensions = self.config.dimensions.resize_height_percentage(percentage);
+        self
     }
 
-    pub fn resize_width_percentage(&self, percentage: f32) -> Self {
-        Self {
-            config: BarcodeConfig {
-                dimensions: self.config.dimensions.resize_width_percentage(percentage),
-                ..self.config.clone()
-            },
-        }
+    pub fn resize_width_percentage(&mut self, percentage: f32) -> &mut Self {
+        self.config.dimensions = self.config.dimensions.resize_width_percentage(percentage);
+        self
     }
 
     pub fn build(&self) -> BarcodeConfig {
