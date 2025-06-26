@@ -1,4 +1,5 @@
 use image::Rgb;
+use tauri::utils::config;
 use zxingcpp::BarcodeFormat;
 
 use crate::generator::barcode_config::BarcodeConfigBuilder;
@@ -61,9 +62,8 @@ impl BulkGenerator {
             config_builder.set_scale(barcode.scale);
             config_builder.resize_height_percentage(barcode.height_percentage);
             config_builder.resize_width_percentage(barcode.width_percentage);
-
-            let mut config = config_builder.build();
-            config.data = barcode.value.clone();
+            config_builder.set_data(barcode.value.clone());
+            let config = config_builder.build();
             let internal_config: crate::generator::barcode_config::BarcodeConfigInternal =
                 config.into();
             let generated_barcode = generator.generate_barcode_png_with_dpi(

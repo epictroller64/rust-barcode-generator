@@ -264,6 +264,11 @@ impl BarcodeConfigBuilder {
         self
     }
 
+    pub fn set_data(&mut self, data: String) -> &mut Self {
+        self.config.data = data;
+        self
+    }
+
     pub fn build(&self) -> BarcodeConfig {
         self.config.clone()
     }

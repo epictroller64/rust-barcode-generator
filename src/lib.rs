@@ -31,7 +31,8 @@ pub fn run() {
             get_templates,
             get_template,
             delete_template,
-            import_barcodes_csv
+            import_barcodes_csv,
+            get_imported_barcodes
         ])
         .setup(|app| {
             app.manage(Mutex::new(AppState {
