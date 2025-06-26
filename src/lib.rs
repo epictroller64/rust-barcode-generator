@@ -1,13 +1,22 @@
 pub mod generator;
 
-use generator::generator::Generator;
-use serde::Serialize;
-use tauri::ipc::Response;
+use std::sync::Mutex;
 
+use tauri::{ipc::Response, State};
+use tauri::{App, Manager};
+
+use crate::generator::importer::BarcodeImportRowCSV;
 use crate::generator::{
     barcode_config::BarcodeConfig,
+    frontend_interface::{FrontendInterface, JsonResponse},
     templates::{self, Template},
 };
+
+#[derive(Clone)]
+struct AppState {
+    frontend: FrontendInterface,
+    imported_barcodes: Vec<BarcodeImportRowCSV>,
+}
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -19,9 +28,14 @@ pub fn run() {
             save_template,
             get_templates,
             get_template,
-            delete_template
+            delete_template,
+            import_barcodes_csv
         ])
         .setup(|app| {
+            app.manage(Mutex::new(AppState {
+                frontend: FrontendInterface::new(),
+                imported_barcodes: vec![],
+            }));
             if cfg!(debug_assertions) {
                 app.handle().plugin(
                     tauri_plugin_log::Builder::default()
@@ -36,112 +50,36 @@ pub fn run() {
 }
 
 #[tauri::command]
-fn get_templates() -> JsonResponse {
-    let template_response = templates::get_templates();
-    match template_response {
-        Ok(templates) => JsonResponse {
-            success: true,
-            message: "Templates fetched successfully".to_string(),
-            data: Some(serde_json::to_value(&templates).unwrap()),
-        },
-        Err(e) => JsonResponse {
-            success: false,
-            message: e.to_string(),
-            data: None,
-        },
-    }
+fn get_templates(state: State<'_, Mutex<AppState>>) -> JsonResponse {
+    let state = state.lock().unwrap();
+    state.frontend.get_templates()
 }
 
 #[tauri::command]
-fn get_template(id: String) -> JsonResponse {
-    let template_response = templates::get_template(id);
-    match template_response {
-        Ok(template) => JsonResponse {
-            success: true,
-            message: "Template fetched successfully".to_string(),
-            data: Some(serde_json::to_value(&template).unwrap()),
-        },
-        Err(e) => JsonResponse {
-            success: false,
-            message: e.to_string(),
-            data: None,
-        },
-    }
+fn get_template(id: String, state: State<'_, Mutex<AppState>>) -> JsonResponse {
+    let state = state.lock().unwrap();
+    state.frontend.get_template(id)
 }
 
 #[tauri::command]
-fn delete_template(id: String) -> JsonResponse {
-    let result = templates::delete_template(&id);
-    match result {
-        Ok(_) => JsonResponse {
-            success: true,
-            message: "Template deleted successfully".to_string(),
-            data: None,
-        },
-        Err(e) => JsonResponse {
-            success: false,
-            message: e.to_string(),
-            data: None,
-        },
-    }
+fn delete_template(id: String, state: State<'_, Mutex<AppState>>) -> JsonResponse {
+    let state = state.lock().unwrap();
+    state.frontend.delete_template(id)
 }
 
 // Save the template to the templates folder
 #[tauri::command]
-fn save_template(template: Template) -> JsonResponse {
-    let result = templates::save_template(template);
-    match result {
-        Ok(_) => JsonResponse {
-            success: true,
-            message: "Successfully saved template".to_string(),
-            data: None,
-        },
-        Err(e) => JsonResponse {
-            success: false,
-            message: e.to_string(),
-            data: None,
-        },
-    }
+fn save_template(template: Template, state: State<'_, Mutex<AppState>>) -> JsonResponse {
+    let state = state.lock().unwrap();
+    state.frontend.save_template(template)
 }
 
 #[tauri::command]
-fn generate_barcode(config: BarcodeConfig) -> Response {
-    let generator = Generator::new();
-
-    // Generate a temporary filename
-    let temp_filename = format!(
-        "temp_barcode_{}.png",
-        std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_millis()
-    );
-
-    // Convert the serializable config to internal config
-    let internal_config: crate::generator::barcode_config::BarcodeConfigInternal = config.into();
-
-    match generator
-        .generate_barcode_png(
-            &internal_config.data.clone(),
-            internal_config,
-            &temp_filename,
-        )
-        .map_err(|e| e.to_string())
-    {
-        Ok(generated_barcode) => {
-            // Convert the image buffer to PNG bytes
-            let mut png_bytes = Vec::new();
-            generated_barcode
-                .buffer
-                .write_with_encoder(image::codecs::png::PngEncoder::new(&mut png_bytes))
-                .map_err(|e| e.to_string())
-                .unwrap();
-
-            // Clean up the temporary file
-            let _ = std::fs::remove_file(&temp_filename);
-
-            tauri::ipc::Response::new(png_bytes)
-        }
+fn generate_barcode(config: BarcodeConfig, state: State<'_, Mutex<AppState>>) -> Response {
+    let state = state.lock().unwrap();
+    let generated_barcode_bytes = state.frontend.generate_barcode(config);
+    match generated_barcode_bytes {
+        Ok(generated_barcode_bytes) => tauri::ipc::Response::new(generated_barcode_bytes),
         Err(e) => {
             println!("Error generating barcode: {}", e);
             return Response::new(e.to_string());
@@ -149,9 +87,32 @@ fn generate_barcode(config: BarcodeConfig) -> Response {
     }
 }
 
-#[derive(Serialize)]
-pub struct JsonResponse {
-    pub success: bool,
-    pub message: String,
-    pub data: Option<serde_json::Value>,
+#[tauri::command]
+fn get_imported_barcodes(state: State<'_, Mutex<AppState>>) -> JsonResponse {
+    let mut state = state.lock().unwrap();
+    JsonResponse {
+        success: true,
+        message: "OK".to_string(),
+        data: Some(state.imported_barcodes),
+    }
+}
+#[tauri::command]
+fn import_barcodes_csv(file_bytes: Vec<u8>, state: State<'_, Mutex<AppState>>) -> JsonResponse {
+    let mut state = state.lock().unwrap();
+    let import_result = state.frontend.import_from_csv(file_bytes);
+    match import_result {
+        Ok(result) => {
+            state.imported_barcodes = result;
+            JsonResponse {
+                success: true,
+                message: "Ok".to_string(),
+                data: None,
+            }
+        }
+        Err(e) => JsonResponse {
+            success: false,
+            message: e.to_string(),
+            data: None,
+        },
+    }
 }

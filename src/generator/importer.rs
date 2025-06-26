@@ -1,5 +1,6 @@
-use serde::Deserialize;
-use std::fs::File;
+use csv::ReaderBuilder;
+use serde::{Deserialize, Serialize};
+use std::{fs::File, io::Cursor};
 pub struct Importer {}
 
 impl Importer {
@@ -7,6 +8,21 @@ impl Importer {
         Self {}
     }
 
+    pub fn import_from_csv_bytes(
+        &self,
+        bytes: Vec<u8>,
+    ) -> anyhow::Result<Vec<BarcodeImportRowCSV>> {
+        let cursor = Cursor::new(bytes);
+        let mut reader = ReaderBuilder::new().has_headers(true).from_reader(cursor);
+        let mut barcodes = Vec::new();
+        for result in reader.deserialize() {
+            // Notice that we need to provide a type hint for automatic
+            // deserialization.
+            let record: BarcodeImportRowCSV = result?;
+            barcodes.push(record);
+        }
+        Ok(barcodes)
+    }
     // Read CSV file and return barcodes. Later add rest of the configuration data.
     // Read: Value
     pub fn import_from_csv(&self, file_path: &str) -> anyhow::Result<Vec<BarcodeImportRowCSV>> {
@@ -23,7 +39,7 @@ impl Importer {
     }
 }
 
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, Debug, Serialize, Clone)]
 pub struct BarcodeImportRowCSV {
     pub value: String,
     pub upper_center_text: String,

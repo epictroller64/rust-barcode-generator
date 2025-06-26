@@ -133,3 +133,7 @@ export interface JsonResponse<T> {
     message: string;
     data?: T;
 }
+
+export interface Layout {
+    config: BarcodeConfig;
+}

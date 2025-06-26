@@ -32,6 +32,17 @@ const Navigation: React.FC = () => {
                     </li>
                     <li>
                         <Link
+                            to="/test"
+                            className={`px-4 py-2 rounded-lg font-medium transition-all duration-200 no-underline ${isActive('/templates')
+                                ? 'text-blue-600 bg-blue-50'
+                                : 'text-gray-500 hover:text-blue-600 hover:bg-gray-50'
+                                }`}
+                        >
+                            Test
+                        </Link>
+                    </li>
+                    <li>
+                        <Link
                             to="/templates"
                             className={`px-4 py-2 rounded-lg font-medium transition-all duration-200 no-underline ${isActive('/templates')
                                 ? 'text-blue-600 bg-blue-50'

@@ -1,5 +1,6 @@
 use crate::generator::calculator::DimensionCalculator;
 
+#[derive(serde::Deserialize, serde::Serialize)]
 pub enum Paper {
     A4,
 }

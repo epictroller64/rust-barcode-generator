@@ -7,7 +7,6 @@ use crate::generator::generator::GeneratedBarcode;
 use crate::generator::generator::Generator;
 // Generate barcodes in bulk and export to file
 use crate::generator::importer::BarcodeImportRowCSV;
-use crate::generator::importer::Importer;
 
 pub struct BulkGenerator {
     output_dir: String,
@@ -18,25 +17,6 @@ impl BulkGenerator {
         Self {
             output_dir: "output".to_string(),
         }
-    }
-
-    pub fn generate_barcodes_from_csv(
-        &self,
-        file_path: &str,
-    ) -> anyhow::Result<Vec<GeneratedBarcode>> {
-        let importer = Importer::new();
-        let barcodes = importer.import_from_csv(file_path)?;
-        self.generate_barcodes(barcodes)
-    }
-
-    pub fn generate_barcodes_with_dpi_from_csv(
-        &self,
-        file_path: &str,
-        dpi: f32,
-    ) -> anyhow::Result<Vec<GeneratedBarcode>> {
-        let importer = Importer::new();
-        let barcodes = importer.import_from_csv(file_path)?;
-        self.generate_barcodes_with_dpi(barcodes, dpi)
     }
 
     pub fn generate_barcodes(

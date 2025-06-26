@@ -1,10 +1,14 @@
 import { invoke } from "@tauri-apps/api/core";
-import type { BarcodeConfig, JsonResponse, Template } from "./interfaces";
+import type { BarcodeConfig, JsonResponse, Layout, Template } from "./interfaces";
 
 export const LocalApi = {
     generateBarcode: async (config: BarcodeConfig) => {
         const result = await invoke('generate_barcode', { config });
         return result as ArrayBuffer;
+    },
+    getLayout: async () => {
+        const result = await invoke('get_layout');
+        return result as JsonResponse<Layout>;
     },
     saveTemplate: async (template: Template) => {
         const result = await invoke('save_template', { template });
@@ -21,5 +25,9 @@ export const LocalApi = {
     deleteTemplate: async (id: string) => {
         const result = await invoke('delete_template', { id });
         return result as JsonResponse<void>;
+    },
+    submitFile: async (bytes: number[]) => {
+        const result = await invoke('import_barcodes_csv', { fileBytes: bytes })
+        return result as JsonResponse<void>
     }
 }
