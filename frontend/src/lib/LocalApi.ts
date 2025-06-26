@@ -1,5 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
-import type { BarcodeConfig, JsonResponse, Layout, Template } from "./interfaces";
+import type { BarcodeConfig, BarcodeImportRowCSV, JsonResponse, Layout, Template } from "./interfaces";
 
 export const LocalApi = {
     generateBarcode: async (config: BarcodeConfig) => {
@@ -29,5 +29,9 @@ export const LocalApi = {
     submitFile: async (bytes: number[]) => {
         const result = await invoke('import_barcodes_csv', { fileBytes: bytes })
         return result as JsonResponse<void>
+    },
+    getImportedBarcodes: async () => {
+        const result = await invoke('get_imported_barcodes')
+        return result as JsonResponse<BarcodeImportRowCSV[]>
     }
 }

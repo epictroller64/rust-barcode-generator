@@ -137,3 +137,13 @@ export interface JsonResponse<T> {
 export interface Layout {
     config: BarcodeConfig;
 }
+
+export interface BarcodeImportRowCSV {
+    value: string;
+    upper_center_text: string;
+    lower_center_text: string;
+    scale: number;
+    height_percentage: number;
+    width_percentage: number;
+    font_size: number;
+}
