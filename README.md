@@ -50,13 +50,13 @@ A powerful, cross-platform barcode generator application built with Rust and Tau
    
    # Install frontend dependencies
    cd frontend
-   pnpm install
+   npm install
    cd ..
    ```
 
 3. **Run the application**
    ```bash
-   cargo tauri dev --release
+   npx tauri dev --release
    ```
 
 ### Building for Production
